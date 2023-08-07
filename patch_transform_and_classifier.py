@@ -40,16 +40,6 @@ logging_handler_err.setLevel(logging.ERROR)
 logging_handler_err.setFormatter(formatter)
 root.addHandler(logging_handler_err)
 
-OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
-
-import os
-if hasattr(os, "add_dll_directory"):
-    # Python >= 3.8 on Windows
-    with os.add_dll_directory(OPENSLIDE_PATH):
-        import openslide
-else:
-    import openslide
-
 HOME_PATH = os.path.expanduser("~")
 PATCH_PATH = "./data/patches"
 OUTPUT_PLOT_PATH = "./output/plots"
