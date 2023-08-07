@@ -16,7 +16,7 @@
 #$ -l tmpfs=16G
 
 # Set name of job
-#$ -N diss-extract-patches
+#$ -N diss-cnn-20x
 
 # Set working directory
 #$ -wd /home/rmhisyl/Scratch/diss
