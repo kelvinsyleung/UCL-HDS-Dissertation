@@ -4,6 +4,8 @@ from pathlib import Path
 import glob
 import gc
 from datetime import datetime
+import logging
+import sys
 
 from PIL import Image
 import numpy as np
@@ -11,6 +13,21 @@ from matplotlib import pyplot as plt
 import geojson
 from patchify import patchify
 import cv2
+
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+
+formatter = logging.Formatter("%(asctime)s-%(levelname)s-%(message)s")
+
+logging_handler_out = logging.StreamHandler(sys.stdout)
+logging_handler_out.setLevel(logging.INFO)
+logging_handler_out.setFormatter(formatter)
+root.addHandler(logging_handler_out)
+
+logging_handler_err = logging.StreamHandler(sys.stderr)
+logging_handler_err.setLevel(logging.ERROR)
+logging_handler_err.setFormatter(formatter)
+root.addHandler(logging_handler_err)
 
 OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
 if hasattr(os, "add_dll_directory"):
@@ -23,8 +40,11 @@ else:
 HOME_PATH = os.path.expanduser("~")
 DATA_PATH = f"{HOME_PATH}/Scratch/BRACS_WSI"
 ANNOT_PATH = f"{HOME_PATH}/Scratch/BRACS_WSI_Annotations"
-PATCH_PATH = f"{HOME_PATH}/Scratch/diss/data/patches"
-OUTPUT_PLOT_PATH = f"{HOME_PATH}/Scratch/diss/output/plots"
+# DATA_PATH = "/mnt/d/UCL-HDS-DissertationDataset/BRACS/BRACS_WSI"
+# ANNOT_PATH = "/mnt/d/UCL-HDS-DissertationDataset/BRACS_WSI_Annotations"
+PATCH_PATH = "./data/patches"
+OUTPUT_PATH = "./output/"
+OUTPUT_PLOT_PATH = "./output/plots"
 
 Path(PATCH_PATH).parent.mkdir(parents=True, exist_ok=True)
 Path(OUTPUT_PLOT_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -94,7 +114,7 @@ def display_rois(rois: List[Dict], output_path: str):
     Given a list of ROIs, display them
     """
     num_of_rois = len(rois)
-    print(f"total number of ROIs: {num_of_rois}")
+    logging.info(f"display_rois - total number of ROIs: {num_of_rois}")
     plt.figure(figsize=(15, int(np.ceil(num_of_rois))))
     for num, roi in enumerate(rois):
         plt.subplot(int(np.ceil(num_of_rois/3)), 3, num+1)
@@ -105,7 +125,7 @@ def display_rois(rois: List[Dict], output_path: str):
     plt.tight_layout()
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path)
-    print(f"saved to {output_path}")
+    logging.info(f"display_rois - saved to {output_path}")
 
 
 def get_relative_coordinates(coordinates: np.ndarray, min_coord: Tuple) -> np.ndarray:
@@ -165,7 +185,7 @@ def display_patches(
     Given a list of ROIs, display them
     """
     num_of_patches = patches.shape[0] * patches.shape[1]
-    print(f"total number of patches: {num_of_patches}")
+    logging.info(f"display_patches - total number of patches: {num_of_patches}")
     plt.figure(figsize=(15, 10))
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
@@ -182,7 +202,7 @@ def display_patches(
     plt.tight_layout()
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path)
-    print(f"saved to {output_path}")
+    logging.info(f"display_patches - saved to {output_path}")
 
 def resize_roi_and_masks(roi_arr: np.ndarray, mask: np.ndarray, downsample_factor: int = 2):
     """
@@ -218,7 +238,7 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
             mask.save(f"{save_path}/mask/{i}_{j}.png")
 
     if verbose:
-        print(f"saved {num_of_patches} patches")
+        logging.info(f"save_patches - saved {num_of_patches} patches")
 
 def patchify_and_save(roi_arr: np.ndarray, mask: np.ndarray, save_path: str = "", overlap: bool = True, verbose: bool = False):
     assert roi_arr.shape[0] == mask.shape[0] and roi_arr.shape[1] == mask.shape[1], "ROI and mask must have the same shape"
@@ -228,13 +248,45 @@ def patchify_and_save(roi_arr: np.ndarray, mask: np.ndarray, save_path: str = ""
     mask_patches = patchify(mask, (min_dim, min_dim), step=step)
     save_patches(roi_patches, mask_patches, save_path=save_path, verbose=verbose)
 
+def create_patches_dataset(annot_path: str, set_type: str = "train"):
+    file_id = annot_path.split("/")[-1].split(".")[0]
+
+    # create if not exists
+    if not f"{PATCH_PATH}/{set_type}/{file_id}" in glob.glob(f"{PATCH_PATH}/{set_type}/{file_id}"):
+        logging.info(f"create_patches_dataset - processing: {file_id}")
+        wsi_file_paths = glob.glob(f"{DATA_PATH}/{set_type}/**/{file_id}.svs", recursive=True)
+
+        if len(wsi_file_paths) != 0:
+            try:
+                slide = openslide.OpenSlide(wsi_file_paths[0])
+                annotations = geojson.load(open(annot_path))
+                bbox_list = create_bbox_list(annotations)
+                rois = get_annotated_rois(slide, bbox_list)
+                masks = create_masks(annotations)
+
+                for idx, (roi, mask) in enumerate(zip(rois, masks)):
+                    roi_arr = np.array(roi["image"])
+                    patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/{set_type}/{file_id}/{roi['class']}-{idx}-40x", overlap=False)
+
+                    roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
+                    patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/{set_type}/{file_id}/{roi['class']}-{idx}-20x", overlap=False)
+
+                slide.close()
+            except Exception as e:
+                logging.exception(f"create_patches_dataset - fail to process {file_id}:")
+                raise e
+
+        gc.collect()
+    else:
+        logging.info(f"create_patches_dataset - {PATCH_PATH}/{set_type}/{file_id} already exists")
+
 if __name__ == "__main__":
     # get slide sample 1
     slide = openslide.OpenSlide(f"{DATA_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
 
-    print("levels:", slide.level_count)
-    print("level dimensions", slide.level_dimensions)
-    print("level downsamples", slide.level_downsamples)
+    logging.info(f"main - levels: {slide.level_count}")
+    logging.info(f"main - level dimensions {slide.level_dimensions}")
+    logging.info(f"main - level downsamples {slide.level_downsamples}")
 
     # get annotations 1
     annotation_file = f"{ANNOT_PATH}/train/Group_AT/Type_ADH/BRACS_1486.geojson"
@@ -246,7 +298,7 @@ if __name__ == "__main__":
     # display lowest resolution 1
     Path(f"{OUTPUT_PLOT_PATH}/train_sample").mkdir(parents=True, exist_ok=True)
     slide.get_thumbnail(slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/train_sample/BRACS_1486.png")
-    print("saved BRACS_1486.png")
+    logging.info("main - saved BRACS_1486.png")
 
     # display ROIs
     display_rois(rois, output_path=f"{OUTPUT_PLOT_PATH}/train_sample/BRACS_1486_rois.png")
@@ -259,7 +311,7 @@ if __name__ == "__main__":
         roi_arr, mask = resize_roi_and_masks(np.array(roi["image"]), mask, downsample_factor=2)
         patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/train_sample/BRACS_1486/{roi['class']}-{idx}-20x", overlap=False)
 
-    print("saved BRACS_1486 patches")
+    logging.info("main - saved BRACS_1486 patches")
 
     # plot sample patches 1
     for sample_patch_folder_path in sorted(glob.glob(f"{PATCH_PATH}/train_sample/BRACS_1486/*"))[0:2]:
@@ -291,9 +343,9 @@ if __name__ == "__main__":
     slide = openslide.OpenSlide(f"{DATA_PATH}/train/Group_BT/Type_PB/BRACS_745.svs")
     slide.read_region((256, 256), 3, (256, 256))
 
-    print("levels:", slide.level_count)
-    print("level dimensions", slide.level_dimensions)
-    print("level downsamples", slide.level_downsamples)
+    logging.info(f"main - levels: {slide.level_count}")
+    logging.info(f"main - level dimensions {slide.level_dimensions}")
+    logging.info(f"main - level downsamples {slide.level_downsamples}")
 
     # get annotations 2
     annotation_file = f"{ANNOT_PATH}/train/Group_BT/Type_PB/BRACS_745.geojson"
@@ -305,7 +357,7 @@ if __name__ == "__main__":
     # display lowest resolution 2
     Path(f"{OUTPUT_PLOT_PATH}/train_sample").mkdir(parents=True, exist_ok=True)
     slide.get_thumbnail(slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/train_sample/BRACS_745.png")
-    print("saved BRACS_745.png")
+    logging.info("main - saved BRACS_745.png")
 
     display_rois(rois, output_path=f"{OUTPUT_PLOT_PATH}/train_sample/BRACS_745_rois.png")
 
@@ -325,75 +377,23 @@ if __name__ == "__main__":
     val_set = glob.glob(f"{ANNOT_PATH}/val/**/*.geojson", recursive=True)
     test_set = glob.glob(f"{ANNOT_PATH}/test/**/*.geojson", recursive=True)
 
-    failed_file_path = Path(f"./logs/failed_preprocess_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
-    print("start processing train set")
+    failed_file_path = Path(f"{OUTPUT_PATH}/failed_preprocess_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
+    failed_files = []
+
+    logging.info("main - start processing train set")   
     for train_annot_path in train_set:
-        file_id = train_annot_path.split("/")[-1].split(".")[0]
+        try:
+            create_patches_dataset(train_annot_path, "train")
+        except Exception as e:
+            failed_files.append(train_annot_path)
+    logging.info(f"main - failed files: {failed_files}")
 
-        # create if not exists
-        if not f"{PATCH_PATH}/train/{file_id}" in glob.glob(f"{PATCH_PATH}/train/{file_id}"):
-            print("processing:", file_id)
-            wsi_file_paths = glob.glob(f"{DATA_PATH}/train/**/{file_id}.svs", recursive=True)
-
-            if len(wsi_file_paths) != 0:
-                try:
-                    slide = openslide.OpenSlide(wsi_file_paths[0])
-                    annotations = geojson.load(open(train_annot_path))
-                    bbox_list = create_bbox_list(annotations)
-                    rois = get_annotated_rois(slide, bbox_list)
-                    masks = create_masks(annotations)
-
-                    for idx, (roi, mask) in enumerate(zip(rois, masks)):
-                        roi_arr = np.array(roi["image"])
-                        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/train/{file_id}/{roi['class']}-{idx}-40x", overlap=False)
-
-                        roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
-                        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/train/{file_id}/{roi['class']}-{idx}-20x", overlap=False)
-
-                    slide.close()
-                except Exception as e:
-                    print(f"fail to process {file_id}:", e)
-                    # write failed WSI file id to a file, create if not exists
-                    failed_file_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(failed_file_path, "a+") as f:
-                        f.write(f"{file_id}\n")
-
-            gc.collect()
-        else:
-            print(f"{PATCH_PATH}/train/{file_id} already exists")
-
-    print("start processing validation set")
+    logging.info("main - start processing validation set")
     for val_annot_path in val_set:
-        file_id = val_annot_path.split("/")[-1].split(".")[0]
+        try:
+            create_patches_dataset(val_annot_path, "val")
+        except Exception as e:
+            failed_files.append(val_annot_path)
+    logging.info(f"main - failed files: {failed_files}")
 
-        # create if not exists
-        if not f"{PATCH_PATH}/val/{file_id}" in glob.glob(f"{PATCH_PATH}/val/{file_id}"):
-            print("processing:", file_id)
-            wsi_file_paths = glob.glob(f"{DATA_PATH}/val/**/{file_id}.svs", recursive=True)
-
-            if len(wsi_file_paths) != 0:
-                try:
-                    slide = openslide.OpenSlide(wsi_file_paths[0])
-                    annotations = geojson.load(open(val_annot_path))
-                    bbox_list = create_bbox_list(annotations)
-                    rois = get_annotated_rois(slide, bbox_list)
-                    masks = create_masks(annotations)
-
-                    for idx, (roi, mask) in enumerate(zip(rois, masks)):
-                        roi_arr = np.array(roi["image"])
-                        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/val/{file_id}/{roi['class']}-{idx}-40x", overlap=False)
-
-                        roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
-                        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/val/{file_id}/{roi['class']}-{idx}-20x", overlap=False)
-
-                    slide.close()
-                except Exception as e:
-                    print(f"fail to process {file_id}:", e)
-                    # write failed WSI file id to a file, create if not exists
-                    failed_file_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(failed_file_path, "a+") as f:
-                        f.write(f"{file_id}\n")
-
-            gc.collect()
-        else:
-            print(f"{PATCH_PATH}/val/{file_id} already exists")
+    failed_file_path.write_text("\n".join(failed_files))

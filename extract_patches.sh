@@ -1,13 +1,13 @@
 #!/bin/bash -l
 
-# Request 3hrs
-#$ -l h_rt=03:00:00
+# Request 10hrs
+#$ -l h_rt=10:00:00
 
-# Request 2GB RAM
-#$ -l mem=2G
+# Request 40GB RAM
+#$ -l mem=40G
 
-# Request 40 gigabyte of TMPDIR space (default is 10 GB - remove if cluster is diskless)
-#$ -l tmpfs=40G
+# Request 64 gigabyte of TMPDIR space (default is 10 GB - remove if cluster is diskless)
+#$ -l tmpfs=64G
 
 # Set name of job
 #$ -N diss-extract-patches
@@ -32,8 +32,8 @@ module load python3/3.9-gnu-10.2.0
 # Install packages
 pip install -q opencv-python pillow matplotlib numpy tqdm patchify geojson openslide-python
 
-# Run the notebook
-python /home/rmhisyl/Scratch/diss/extract_patches.py
+# Run the script
+python /home/rmhisyl/diss-code/extract_patches.py
 
 # Copy files back to scratch
 tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR
