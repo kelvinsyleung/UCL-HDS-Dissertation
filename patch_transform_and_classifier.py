@@ -7,6 +7,7 @@ import time
 import gc
 import logging
 import sys
+import argparse
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -40,22 +41,11 @@ logging_handler_err.setLevel(logging.ERROR)
 logging_handler_err.setFormatter(formatter)
 root.addHandler(logging_handler_err)
 
-HOME_PATH = os.path.expanduser("~")
-PATCH_PATH = "./data/patches"
-OUTPUT_PLOT_PATH = "./output/plots"
-OUTPUT_MODEL_PATH = "./output/models"
-
-Path(OUTPUT_PLOT_PATH).parent.mkdir(parents=True, exist_ok=True)
-Path(OUTPUT_MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
-
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logging.info(f"pytorch device using: {device}")
 
 def cielab_intensify_to_rgb(img: Union[np.ndarray, torch.Tensor], rate: float):
     cie_img = np.array(img)
@@ -76,6 +66,24 @@ def cielab_intensify_to_rgb(img: Union[np.ndarray, torch.Tensor], rate: float):
 
 
 if __name__ == "__main__":
+    argParser = argparse.ArgumentParser()
+    argParser.add_argument("-p", "--project_root", help="project root path", type=str, default=".", required=True)
+    args = argParser.parse_args()
+
+    # absolute path for loading patches
+    PROJECT_ROOT = args.project_root
+    DATA_PATH = f"{PROJECT_ROOT}/data"
+    PATCH_PATH = f"{DATA_PATH}/patches"
+    # relative to script execution path
+    OUTPUT_PLOT_PATH = "./output/plots"
+    OUTPUT_MODEL_PATH = "./output/models"
+
+    Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
+    Path(OUTPUT_MODEL_PATH).mkdir(parents=True, exist_ok=True)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f"pytorch device using: {device}")
+
     train_sample_patches_paths = glob.glob(PATCH_PATH + "/train_sample/*")
     test_img_path = ""
     test_mask_path = ""
@@ -157,10 +165,10 @@ if __name__ == "__main__":
 
     logging.info(f"main - Number of 20x train images: {len(train_20x_img_path)}")
 
-    with open('data/train_20x_img_paths.txt', 'w+') as f:
+    with open(f'{DATA_PATH}/train_20x_img_paths.txt', 'w+') as f:
         f.write('\n'.join(train_20x_img_path))
 
-    with open('data/train_20x_mask_paths.txt', 'w+') as f:
+    with open(f'{DATA_PATH}/train_20x_mask_paths.txt', 'w+') as f:
         f.write('\n'.join(train_20x_mask_path))
 
     val_20x_patches_paths = sorted(glob.glob(PATCH_PATH + "/val/**/*-20x"))
@@ -179,10 +187,10 @@ if __name__ == "__main__":
 
     logging.info(f"main - Number of 20x val images: {len(val_20x_img_path)}")
 
-    with open('data/val_20x_img_paths.txt', 'w+') as f:
+    with open(f'{DATA_PATH}/val_20x_img_paths.txt', 'w+') as f:
         f.write('\n'.join(val_20x_img_path))
 
-    with open('data/val_20x_mask_paths.txt', 'w+') as f:
+    with open(f'{DATA_PATH}/val_20x_mask_paths.txt', 'w+') as f:
         f.write('\n'.join(val_20x_mask_path))
 
     # test 20x datasets creation
