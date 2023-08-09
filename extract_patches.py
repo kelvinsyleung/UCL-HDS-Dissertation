@@ -5,7 +5,6 @@ import glob
 import gc
 from datetime import datetime
 import logging
-import sys
 
 from PIL import Image
 import numpy as np
@@ -14,20 +13,7 @@ import geojson
 from patchify import patchify
 import cv2
 
-root = logging.getLogger()
-root.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(asctime)s-%(levelname)s-%(message)s")
-
-logging_handler_out = logging.StreamHandler(sys.stdout)
-logging_handler_out.setLevel(logging.INFO)
-logging_handler_out.setFormatter(formatter)
-root.addHandler(logging_handler_out)
-
-logging_handler_err = logging.StreamHandler(sys.stderr)
-logging_handler_err.setLevel(logging.ERROR)
-logging_handler_err.setFormatter(formatter)
-root.addHandler(logging_handler_err)
+from log_utils import setup_logging
 
 OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
 if hasattr(os, "add_dll_directory"):
@@ -281,6 +267,8 @@ def create_patches_dataset(annot_path: str, set_type: str = "train"):
         logging.info(f"create_patches_dataset - {PATCH_PATH}/{set_type}/{file_id} already exists")
 
 if __name__ == "__main__":
+    setup_logging()
+    
     # get slide sample 1
     slide = openslide.OpenSlide(f"{DATA_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
 

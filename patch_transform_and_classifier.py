@@ -25,21 +25,7 @@ from class_mapping import NAME2SUBTYPELABELS_MAP, LABELS2SUBTYPE_MAP, NAME2TYPEL
 from patch_dataset import PatchDataset
 from model import UNet
 from train_utils import run_train_loop, seed_worker, plot_history
-
-root = logging.getLogger()
-root.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(asctime)s-%(levelname)s-%(message)s")
-
-logging_handler_out = logging.StreamHandler(sys.stdout)
-logging_handler_out.setLevel(logging.INFO)
-logging_handler_out.setFormatter(formatter)
-root.addHandler(logging_handler_out)
-
-logging_handler_err = logging.StreamHandler(sys.stderr)
-logging_handler_err.setLevel(logging.ERROR)
-logging_handler_err.setFormatter(formatter)
-root.addHandler(logging_handler_err)
+from log_utils import setup_logging
 
 torch.manual_seed(0)
 random.seed(0)
@@ -66,6 +52,8 @@ def cielab_intensify_to_rgb(img: Union[np.ndarray, torch.Tensor], rate: float):
 
 
 if __name__ == "__main__":
+    setup_logging()
+
     argParser = argparse.ArgumentParser()
     argParser.add_argument("-p", "--project_root", help="project root path", type=str, default=".", required=True)
     args = argParser.parse_args()
@@ -261,7 +249,7 @@ if __name__ == "__main__":
     # define the hyperparameters
     LEARNING_RATE = 1e-4
     BATCHSIZE = 32
-    EPOCHS = 300
+    EPOCHS = 100
     NUM_WORKERS = 4
     PREFETCH_FACTOR = 4
 
