@@ -3,20 +3,17 @@
 # Request GPU
 #$ -l gpu=1
 
-# request V100 or A100 node
-#$ -ac allow=EFL
+# Request 10hrs
+#$ -l h_rt=12:00:00
 
-# Request 20hrs
-#$ -l h_rt=20:00:00
+# Request 16GB RAM
+#$ -l mem=32G
 
-# Request 40GB RAM
-#$ -l mem=40G
-
-# Request 64 gigabyte of TMPDIR space (default is 10 GB - remove if cluster is diskless)
+# Request 16 gigabyte of TMPDIR space (default is 10 GB - remove if cluster is diskless)
 #$ -l tmpfs=16G
 
 # Set name of job
-#$ -N diss-cnn-20x
+#$ -N diss-cnn-20x-patches
 
 # Set working directory
 #$ -wd /home/rmhisyl/Scratch/diss
@@ -37,11 +34,10 @@ module load cudnn/8.2.1.32/cuda-11.3
 module load pytorch/1.11.0/gpu
 
 # Install packages
-pip install --upgrade pip
 pip install -q -r /home/rmhisyl/Scratch/diss/cnn_requirements.txt
 
 # Run the script
-python /home/rmhisyl/Scratch/diss/patch_transform_and_classifier.py
+python /home/rmhisyl/Scratch/diss/patch_transform_and_classifier.py --project_root /home/rmhisyl/Scratch/diss
 
 # Copy files back to scratch
-tar -zcvf $HOME/Scratch/files_from_job_$JOB_ID.tar.gz $TMPDIR
+tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR
