@@ -24,15 +24,16 @@ Dataset Used: https://www.bracs.icar.cnr.it/
 |---|---|---|
 | Patch Extraction | Completed 🙂 | 28-7-2023 |
 | Data Transformation Pipeline | Completed 🙂 | 21-7-2023 |
-| CNN Classifier | WIP 🧑🏻‍💻 | (31-7-2023) |
-| Evalutaion Module | Planning 📆 | (2-8-2023) |
+| CNN Classifier - Patch Level | Completed 🙂 | 8-8-2023 |
+| CNN Classifier - Slide Level | WIP 🧑🏻‍💻 | (15-8-2023) |
+| Evalutaion Module | WIP 🧑🏻‍💻 | (15-8-2023) |
 
 ### High Performance Cluster Run
 | Work | Status | Completion Date (Expected Date) |
 |---|---|---|
-| Upload Dataset | WIP 🧑🏻‍💻 | (31-7-2023) |
-| Job scripts |  Planning 📆 | (4-8-2023) |
-| Factorial Design | Planning 📆 | (8-8-2023) |
+| Upload Dataset | Completed 🙂 | 1-8-2023 |
+| Job scripts |  Completed 🙂 | 5-8-2023 |
+| Factorial Design | WIP 🧑🏻‍💻 | (8-8-2023) |
 | Sequential Model | Planning 📆 | (10-8-2023) |
 | Adaptive Model | Planning 📆 | (16-8-2023) |
 
@@ -91,8 +92,17 @@ python extract_patches.py
 ```
 
 ### Sample patch transform and classifier
-use the `-p` or `--project_root` option to indicate where are the patches extracted in the previous step
+use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
 
 ```python
-python patch_transform_and_classifier --project-path <project_path>
+python patch_transform_showcase.py --project_path <project_path>
+```
+
+### Patch level UNET
+use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
+use the `-c` or `--color_space` option to indicate the target colour space for transformation (`RGB`, `CIELAB`, `BW`)
+use the `-m` or `--mag` option to indicate the specific magnification of patches used to train the model (`20x`, `40x`)
+
+```python
+python train-unet.py --project_path <project_path> --color_space <color_space> --mag <magnification>
 ```
