@@ -76,14 +76,13 @@ ANNOT_PATH - BRACS_WSI
 
 
 ## Run
-### Download the dataset from BRACS for processing. The directories structure from BRACS should be identical to above by default. Otherwise, format and align with above.
+### Download the dataset from BRACS for processing
+The directories structure from BRACS should be identical to above by default. Otherwise, format and align with above.
 
 ### Annotation preprocessing
-open QuPath to edit the `qp_annotations_to_json.groovy` script
-
-specify the `ANNOT_PATH` in line 5 `def outputPath = "path/to/BRACS_WSI_Annotations"`
-
-run and generate `.geojson` files from the original `.qpdata` files into the same `ANNOT_PATH`
+1. open QuPath to edit the `qp_annotations_to_json.groovy` script
+2. specify the `ANNOT_PATH` in line 5 `def outputPath = "path/to/BRACS_WSI_Annotations"`
+3. run and generate `.geojson` files from the original `.qpdata` files into the same `ANNOT_PATH`
 
 ### Patch Extraction Module
 modify the file `DATA_PATH` and `ANNOT_PATH` to point to the directories with the WSIs and the annotations
@@ -100,7 +99,9 @@ python patch_transform_showcase.py --project_path <project_path>
 
 ### Patch level UNET
 use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
+
 use the `-c` or `--color_space` option to indicate the target colour space for transformation (`RGB`, `CIELAB`, `BW`)
+
 use the `-m` or `--mag` option to indicate the specific magnification of patches used to train the model (`20x`, `40x`)
 
 ```python
