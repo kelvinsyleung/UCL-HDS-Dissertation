@@ -3,17 +3,12 @@ import random
 import os
 from pathlib import Path
 import glob
-import time
-import gc
 import logging
-import sys
 import argparse
 
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2
-
-import segmentation_models_pytorch as smp
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -21,17 +16,13 @@ from albumentations.pytorch import ToTensorV2
 import torch
 from torch.utils.data import DataLoader
 
-from class_mapping import NAME2SUBTYPELABELS_MAP, LABELS2SUBTYPE_MAP, NAME2TYPELABELS_MAP, LABELS2TYPE_MAP
+from class_mapping import NAME2SUBTYPELABELS_MAP
 from patch_dataset import PatchDataset
-from model import UNet
-from train_utils import run_train_loop, seed_worker, plot_history
 from log_utils import setup_logging
 
 torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
 
 def cielab_intensify_to_rgb(img: Union[np.ndarray, torch.Tensor], rate: float):
     cie_img = np.array(img)
@@ -55,22 +46,20 @@ if __name__ == "__main__":
     setup_logging()
 
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("-p", "--project_root", help="project root path", type=str, default=".", required=True)
+    argParser.add_argument("-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
     args = argParser.parse_args()
 
     # absolute path for loading patches
     PROJECT_ROOT = args.project_root
     DATA_PATH = f"{PROJECT_ROOT}/data"
     PATCH_PATH = f"{DATA_PATH}/patches"
+
     # relative to script execution path
     OUTPUT_PLOT_PATH = "./output/plots"
     OUTPUT_MODEL_PATH = "./output/models"
 
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
     Path(OUTPUT_MODEL_PATH).mkdir(parents=True, exist_ok=True)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logging.info(f"pytorch device using: {device}")
 
     train_sample_patches_paths = glob.glob(PATCH_PATH + "/train_sample/*")
     test_img_path = ""
@@ -242,215 +231,3 @@ if __name__ == "__main__":
     plt.imshow(mask[0] > 0, alpha=0.3, cmap="gray")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/rgb_dataloader_example.png")
 
-
-    torch.cuda.empty_cache()
-    gc.collect()
-
-    # define the hyperparameters
-    LEARNING_RATE = 1e-4
-    BATCHSIZE = 32
-    EPOCHS = 100
-    NUM_WORKERS = 4
-    PREFETCH_FACTOR = 4
-
-    # RGB 20x 3cls
-    # model
-    model = UNet(in_channels=3, out_channels=4)
-
-    # datasets
-    patch_rgb_20x_3cls_train_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
-        mode="RGB",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=train_transform,
-        seed=0
-    )
-
-    patch_rgb_20x_3cls_val_dataset = PatchDataset(
-        imgPaths=val_20x_img_path,
-        maskPaths=val_20x_mask_path,
-        mode="RGB",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=val_transform,
-        seed=0
-    )
-
-    # dataloaders
-    worker_g = torch.Generator()
-    worker_g.manual_seed(0)
-
-    train_batches = DataLoader(
-        patch_rgb_20x_3cls_train_dataset, batch_size=BATCHSIZE, shuffle=True,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    worker_g.manual_seed(0)
-    valid_batches = DataLoader(
-        patch_rgb_20x_3cls_val_dataset, batch_size=BATCHSIZE, shuffle=False,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    
-    # define the loss function and the optimizer
-    criterion = smp.losses.DiceLoss(mode="multiclass", from_logits=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
-    start_time = time.time()
-
-    set_name = "unet_rgb_20x_8=3cls"
-    # train the network
-    history = run_train_loop(
-        model, 8, device,
-        train_batches, valid_batches, len(patch_rgb_20x_3cls_train_dataset), len(patch_rgb_20x_3cls_val_dataset),
-        EPOCHS, criterion, optimizer, set_name, save_interval=50
-    )
-    torch.save(
-        {
-            "epoch": EPOCHS,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "history": history,
-        },
-        f"{OUTPUT_MODEL_PATH}/{set_name}_model_final.pth"
-    )
-
-    # display the total time needed to perform the training
-    end_time = time.time()
-    logging.info(f"main - Total time taken to train the {set_name} model: {(end_time - start_time):.2f}s")
-
-    # plot the loss and accuracy history
-    plot_history(history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")
-
-    # CIELAB 20x 3cls
-    # model
-    model = UNet(in_channels=3, out_channels=4)
-
-    # datasets
-    patch_cielab_20x_3cls_train_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
-        mode="CIELAB",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=train_transform,
-        seed=0
-    )
-
-    patch_cielab_20x_3cls_val_dataset = PatchDataset(
-        imgPaths=val_20x_img_path,
-        maskPaths=val_20x_mask_path,
-        mode="CIELAB",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=val_transform,
-        seed=0
-    )
-
-    # dataloaders
-    worker_g = torch.Generator()
-    worker_g.manual_seed(0)
-
-    train_batches = DataLoader(
-        patch_cielab_20x_3cls_train_dataset, batch_size=BATCHSIZE, shuffle=True,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    worker_g.manual_seed(0)
-    valid_batches = DataLoader(
-        patch_cielab_20x_3cls_val_dataset, batch_size=BATCHSIZE, shuffle=False,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    
-    # define the loss function and the optimizer
-    criterion = smp.losses.DiceLoss(mode="multiclass", from_logits=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
-    start_time = time.time()
-
-    set_name = "unet_cielab_20x_3cls"
-    # train the network
-    history = run_train_loop(
-        model, 8, device,
-        train_batches, valid_batches, len(patch_cielab_20x_3cls_train_dataset), len(patch_cielab_20x_3cls_val_dataset),
-        EPOCHS, criterion, optimizer, set_name, save_interval=50
-    )
-    torch.save(
-        {
-            "epoch": EPOCHS,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "history": history,
-        },
-        f"{OUTPUT_MODEL_PATH}/{set_name}_model_final.pth"
-    )
-
-    # display the total time needed to perform the training
-    end_time = time.time()
-    logging.info(f"main - Total time taken to train the {set_name} model: {(end_time - start_time):.2f}s")
-
-    # plot the loss and accuracy history
-    plot_history(history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")
-
-
-    # BW 20x 3cls
-    # model
-    model = UNet(in_channels=1, out_channels=4)
-
-    # datasets
-    patch_bw_20x_3cls_train_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
-        mode="BW",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=train_transform,
-        seed=0
-    )
-
-    patch_bw_20x_3cls_val_dataset = PatchDataset(
-        imgPaths=val_20x_img_path,
-        maskPaths=val_20x_mask_path,
-        mode="BW",
-        name_to_class_mapping=NAME2TYPELABELS_MAP,
-        transform=val_transform,
-        seed=0
-    )
-
-    # dataloaders
-    worker_g = torch.Generator()
-    worker_g.manual_seed(0)
-
-    train_batches = DataLoader(
-        patch_bw_20x_3cls_train_dataset, batch_size=BATCHSIZE, shuffle=True,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    worker_g.manual_seed(0)
-    valid_batches = DataLoader(
-        patch_bw_20x_3cls_val_dataset, batch_size=BATCHSIZE, shuffle=False,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
-    )
-    
-    # define the loss function and the optimizer
-    criterion = smp.losses.DiceLoss(mode="multiclass", from_logits=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
-    start_time = time.time()
-
-    set_name = "unet_cielab_20x_3cls"
-    # train the network
-    history = run_train_loop(
-        model, 8, device,
-        train_batches, valid_batches, len(patch_bw_20x_3cls_train_dataset), len(patch_bw_20x_3cls_val_dataset),
-        EPOCHS, criterion, optimizer, set_name, save_interval=50
-    )
-    torch.save(
-        {
-            "epoch": EPOCHS,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "history": history,
-        },
-        f"{OUTPUT_MODEL_PATH}/{set_name}_model_final.pth"
-    )
-
-    # display the total time needed to perform the training
-    end_time = time.time()
-    logging.info(f"main - Total time taken to train the {set_name} model: {(end_time - start_time):.2f}s")
-
-    # plot the loss and accuracy history
-    plot_history(history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")
