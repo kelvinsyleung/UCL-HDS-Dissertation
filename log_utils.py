@@ -8,6 +8,7 @@ def setup_logging():
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
+    root.handlers = []
 
     formatter = logging.Formatter("%(asctime)s-%(levelname)s-%(message)s")
 
