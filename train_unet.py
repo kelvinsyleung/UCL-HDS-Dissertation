@@ -43,10 +43,10 @@ if __name__ == "__main__":
 
     # relative to script execution path
     OUTPUT_PLOT_PATH = "./output/plots"
-    OUTPUT_MODEL_PATH = "./output/models"
+    MODEL_SAVEPATH = "./models"
 
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
-    Path(OUTPUT_MODEL_PATH).mkdir(parents=True, exist_ok=True)
+    Path(MODEL_SAVEPATH).mkdir(parents=True, exist_ok=True)
 
     # check device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,8 +56,6 @@ if __name__ == "__main__":
     logging.info(f"main - MAGNIFICATION: {MAGNIFICATION}")
     # load dataset
     train_patches_paths = sorted(glob.glob(f"{PATCH_PATH}/train/**/*-{MAGNIFICATION}"))
-
-    set(map(lambda x: "-".join(os.path.split(x)[-1].split("-")[:-2]), train_patches_paths))
 
     train_img_path = []
     train_mask_path = []
@@ -107,8 +105,8 @@ if __name__ == "__main__":
     LEARNING_RATE = 1e-4
     BATCHSIZE = 32
     EPOCHS = 100
-    NUM_WORKERS = 2
-    PREFETCH_FACTOR = 2
+    NUM_WORKERS = 8
+    PREFETCH_FACTOR = 4
 
 
     input_channels = 3
@@ -127,6 +125,7 @@ if __name__ == "__main__":
         maskPaths=train_mask_path,
         mode=COLOR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
+        level="pixel",
         transform=train_transform,
         seed=0
     )
@@ -136,6 +135,7 @@ if __name__ == "__main__":
         maskPaths=val_mask_path,
         mode=COLOR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
+        level="pixel",
         transform=val_transform,
         seed=0
     )
@@ -164,8 +164,9 @@ if __name__ == "__main__":
     # train the network
     history = run_train_loop(
         model, 8, device,
-        train_batches, valid_batches, len(patch_train_dataset), len(patch_val_dataset),
-        EPOCHS, criterion, optimizer, set_name, save_interval=50
+        train_batches, valid_batches,
+        EPOCHS, criterion, optimizer, set_name,
+        save_interval=50, save_path=MODEL_SAVEPATH
     )
     torch.save(
         {
@@ -174,7 +175,7 @@ if __name__ == "__main__":
             "optimizer_state_dict": optimizer.state_dict(),
             "history": history,
         },
-        f"{OUTPUT_MODEL_PATH}/{set_name}_model_final.pth"
+        f"{MODEL_SAVEPATH}/{set_name}_model_final.pth"
     )
 
     # display the total time needed to perform the training

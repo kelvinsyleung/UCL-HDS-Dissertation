@@ -3,9 +3,6 @@
 # Request GPU
 #$ -l gpu=1
 
-# Request V100 or A100 GPU nodes only
-#$ -ac allow=EFL
-
 # Request 18hrs
 #$ -l h_rt=18:00:00
 
@@ -16,7 +13,7 @@
 #$ -l tmpfs=16G
 
 # Set name of job
-#$ -N diss-20x-cielab-unet
+#$ -N diss-40x-bw-unet
 
 # Set working directory
 #$ -wd /home/rmhisyl/Scratch/diss
@@ -40,7 +37,7 @@ module load pytorch/1.11.0/gpu
 pip install -q -r /home/rmhisyl/Scratch/diss/cnn_requirements.txt
 
 # Run the script
-python /home/rmhisyl/Scratch/diss/train_unet.py --project_root /home/rmhisyl/Scratch/diss --color_space CIELAB --mag 20x
+python /home/rmhisyl/Scratch/diss/train_unet.py --project_root /home/rmhisyl/Scratch/diss --color_space BW --mag 40x
 
 # Copy files back to scratch
 tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR

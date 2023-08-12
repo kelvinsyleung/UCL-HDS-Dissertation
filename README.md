@@ -104,5 +104,5 @@ use the `-c` or `--color_space` option to indicate the target colour space for t
 use the `-m` or `--mag` option to indicate the specific magnification of patches used to train the model (`20x`, `40x`)
 
 ```python
-python train-unet.py --project_path <project_path> --color_space <color_space> --mag <magnification>
+python train_unet.py --project_path <project_path> --color_space <color_space> --mag <magnification>
 ```

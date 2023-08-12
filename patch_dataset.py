@@ -1,15 +1,22 @@
 from torch.utils.data import Dataset
 import cv2
 import random
-from typing import Dict
+from typing import Dict, Literal
 
 class PatchDataset(Dataset):
-    def __init__(self, imgPaths, maskPaths, mode: str,
-        name_to_class_mapping: Dict, transform=None, seed=0):
+    def __init__(
+            self, imgPaths, maskPaths, mode: str,
+            name_to_class_mapping: Dict,
+            level: Literal["patch", "pixel"] = "patch",
+            patch_area_threshold: int = 0.4,
+            transform=None, seed=0
+        ):
         self.imgs = imgPaths
         self.masks = maskPaths
         self.transform = transform
         self.mode = mode
+        self.level = level
+        self.patch_area_threshold = patch_area_threshold
         self.name_to_class_mapping = name_to_class_mapping
         self.seed = seed
         
@@ -38,11 +45,24 @@ class PatchDataset(Dataset):
         if self.transform:
             # transform the image
             random.seed(self.seed)
-            transformed = self.transform(image=img, mask=mask)
-            img, mask = transformed["image"].float()/255.0, transformed["mask"]/255.0
-            mask[mask > 0.5] = class_id
-            mask[mask <= 0.5] = 0
-            mask = mask.long()
+            ground_truth = None
+            if self.level == "pixel": # for segmentation
+                transformed = self.transform(image=img, mask=mask)
+                img, mask = transformed["image"].float()/255.0, transformed["mask"]/255.0
+                mask[mask > 0.5] = class_id
+                mask[mask <= 0.5] = 0
+                mask = mask.long()
+                ground_truth = mask
+            elif self.level == "patch": # for patch level classification
+                transformed = self.transform(image=img)
+                img = transformed["image"].float()/255.0
+                if mask.mean() >= self.patch_area_threshold:
+                    ground_truth = class_id
+                else:
+                    ground_truth = 0
+            else:
+                raise Exception("Invalid level")
+            
             self.seed += 1
             
-        return img, mask
+        return img, ground_truth

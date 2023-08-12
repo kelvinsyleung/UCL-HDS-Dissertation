@@ -40,7 +40,7 @@ module load pytorch/1.11.0/gpu
 pip install -q -r /home/rmhisyl/Scratch/diss/cnn_requirements.txt
 
 # Run the script
-python /home/rmhisyl/Scratch/diss/train-unet.py --project_root /home/rmhisyl/Scratch/diss --color_space BW --mag 20x
+python /home/rmhisyl/Scratch/diss/train_unet.py --project_root /home/rmhisyl/Scratch/diss --color_space BW --mag 20x
 
 # Copy files back to scratch
 tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR
