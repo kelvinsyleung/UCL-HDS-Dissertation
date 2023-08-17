@@ -34,10 +34,6 @@ def run_train_loop(
             The training data loader.
         valid_batches: DataLoader
             The validation data loader.
-        train_set_len: int
-            The length of the training set.
-        val_set_len: int
-            The length of the validation set.
         epochs: int
             The number of epochs to train the model for.
         criterion: torch.nn.Module
@@ -46,8 +42,12 @@ def run_train_loop(
             The optimizer to use.
         set_name: str
             The name of the dataset.
+        patience: int
+            The number of epochs to wait before stopping training if the validation loss does not improve.
         save_interval: Union[int, None]
             The interval at which to save extra models. None to save only the best model.
+        save_path: str
+            The path to save the models.
     """
     model.to(device)
 
