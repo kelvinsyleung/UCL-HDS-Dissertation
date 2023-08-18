@@ -16,6 +16,7 @@ def run_train_loop(
         model: nn.Module, num_classes: int, device: torch.device,
         train_batches: DataLoader, valid_batches: DataLoader,
         epochs: int, criterion: torch.nn.Module, optimizer: torch.optim.Optimizer,
+        eval_fn: callable,
         set_name: str,
         patience: int=10, save_interval: Union[int, None]=50, save_path: str="./models/"
     ):
@@ -91,8 +92,7 @@ def run_train_loop(
             total_train_loss += loss.item()
 
             # evaluate score on test set
-            tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(output, dim=1).long(), targets, mode="multiclass", num_classes=num_classes)
-            train_score = smp.metrics.f1_score(tp, fp, fn, tn, reduction="macro")
+            train_score = eval_fn(output, targets, num_classes=num_classes)
 
         # set the model in evaluation phase
         with torch.no_grad():
@@ -109,8 +109,7 @@ def run_train_loop(
                 total_val_loss += loss.item()
                 
                 # evaluate score on test set
-                tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(output, dim=1).long(), targets, mode="multiclass", num_classes=num_classes)
-                val_score = smp.metrics.f1_score(tp, fp, fn, tn, reduction="macro")
+                val_score = eval_fn(output, targets, num_classes=num_classes)
 
         # compute the average loss and accuracy
         avg_train_loss = total_train_loss / len(train_batches)

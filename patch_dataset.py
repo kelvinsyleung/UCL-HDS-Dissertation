@@ -1,23 +1,29 @@
 from torch.utils.data import Dataset
 import cv2
+import numpy as np
 import random
+import torchstain
 from typing import Dict, Literal
 
 class PatchDataset(Dataset):
     def __init__(
-            self, imgPaths, maskPaths, mode: str,
+            self, img_paths, mask_paths, mode: str,
             name_to_class_mapping: Dict,
+            stain_normaliser: torchstain.normalizers.HENormalizer,
             level: Literal["patch", "pixel"] = "patch",
             patch_area_threshold: int = 0.4,
+            white_threshold: int = 220,
             transform=None, seed=0
         ):
-        self.imgs = imgPaths
-        self.masks = maskPaths
+        self.imgs = img_paths
+        self.masks = mask_paths
         self.transform = transform
         self.mode = mode
+        self.name_to_class_mapping = name_to_class_mapping
+        self.stain_normaliser = stain_normaliser
         self.level = level
         self.patch_area_threshold = patch_area_threshold
-        self.name_to_class_mapping = name_to_class_mapping
+        self.white_threshold = white_threshold
         self.seed = seed
         
     def __len__(self):
@@ -30,13 +36,23 @@ class PatchDataset(Dataset):
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         # print(f"image path: {img_path}, mask path: {mask_path}")
         
-        if self.mode == "RGB":
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        elif self.mode == "CIELAB":
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # white thresholding
+        is_majority_white = (img > self.white_threshold).sum() > (img.shape[0] * img.shape[1] * 3)
+
+        if not is_majority_white:
+            try:
+                img, _, _ = self.stain_normaliser.normalize(img)
+            except Exception as e:
+                print(f"Error in normalising image: {img_path}")
+                print(e)
+        else:
+            mask = np.zeros_like(mask)
+
+        if self.mode == "CIELAB":
             img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
         elif self.mode == "BW":
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
         class_id = self.name_to_class_mapping["-".join(img_path.split("/")[-3].split("-")[:-2])]
@@ -66,3 +82,38 @@ class PatchDataset(Dataset):
             self.seed += 1
             
         return img, ground_truth
+    
+class SlideROIDataset(Dataset):
+    def __init__(
+            self, img_paths, roi_paths,
+            transform=None, seed=0
+        ):
+        self.imgs = img_paths
+        self.rois = roi_paths
+        self.transform = transform
+        self.seed = seed
+
+    def __len__(self):
+        return len(self.imgs)
+    
+    def __getitem__(self, idx):
+        img_path = self.imgs[idx]
+        roi_path = self.rois[idx]
+        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        rois = np.load(roi_path).reshape(-1, 4)
+        class_labels = np.ones(rois.shape[0])
+        # print(f"image path: {img_path}, roi path: {roi_path}")
+        
+        # set seed so that the same transformation is applied to image and mask
+        if self.transform:
+            # transform the image
+            random.seed(self.seed)
+
+            transformed = self.transform(image=img, bboxes=rois, class_labels=class_labels)
+            img = transformed["image"].float()/255.0
+            rois = transformed["bboxes"]
+            class_labels = transformed["class_labels"]
+            
+            self.seed += 1
+            
+        return img, rois, class_labels

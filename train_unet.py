@@ -6,6 +6,9 @@ import logging
 import random
 import time
 
+import cv2
+import torchstain
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -119,22 +122,30 @@ if __name__ == "__main__":
     # model
     model = UNet(in_channels=input_channels, out_channels=4)
 
+    norm_img_path = val_img_path[len(val_img_path)//2]
+    norm_img_arr = cv2.cvtColor(cv2.imread(norm_img_path), cv2.COLOR_BGR2RGB)
+
+    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(backend='numpy')
+    stain_normaliser.fit(norm_img_arr)
+
     # datasets
     patch_train_dataset = PatchDataset(
-        imgPaths=train_img_path,
-        maskPaths=train_mask_path,
+        img_paths=train_img_path,
+        mask_paths=train_mask_path,
         mode=COLOR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
+        stain_normaliser=stain_normaliser,
         level="pixel",
         transform=train_transform,
         seed=0
     )
 
     patch_val_dataset = PatchDataset(
-        imgPaths=val_img_path,
-        maskPaths=val_mask_path,
+        img_paths=val_img_path,
+        mask_paths=val_mask_path,
         mode=COLOR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
+        stain_normaliser=stain_normaliser,
         level="pixel",
         transform=val_transform,
         seed=0
@@ -161,12 +172,18 @@ if __name__ == "__main__":
     start_time = time.time()
 
     set_name = f"unet_{COLOR_SPACE}_{MAGNIFICATION}"
+
+    def eval_fn(output, targets, num_classes):
+        tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(output, dim=1).long(), targets, mode="multiclass", num_classes=num_classes)
+        return smp.metrics.f1_score(tp, fp, fn, tn, reduction="macro")
+
     # train the network
     history = run_train_loop(
         model, 8, device,
         train_batches, valid_batches,
-        EPOCHS, criterion, optimizer, set_name,
-        save_interval=50, save_path=MODEL_SAVEPATH
+        EPOCHS, criterion, optimizer,
+        eval_fn,
+        set_name, save_interval=50, save_path=MODEL_SAVEPATH
     )
     torch.save(
         {

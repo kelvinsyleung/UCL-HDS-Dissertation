@@ -9,6 +9,7 @@ import argparse
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2
+import torchstain
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -170,30 +171,42 @@ if __name__ == "__main__":
     with open(f'{DATA_PATH}/val_20x_mask_paths.txt', 'w+') as f:
         f.write('\n'.join(val_20x_mask_path))
 
+    norm_img_path = val_20x_img_path[len(val_20x_img_path)//2]
+    norm_img_arr = cv2.cvtColor(cv2.imread(norm_img_path), cv2.COLOR_BGR2RGB)
+
+    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(backend='numpy')
+    stain_normaliser.fit(norm_img_arr)
+
     # test 20x datasets creation
     patch_rgb_20x_8cls_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
+        img_paths=train_20x_img_path,
+        mask_paths=train_20x_mask_path,
         mode="RGB",
         name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        stain_normaliser=stain_normaliser,
+        level="pixel",
         transform=train_transform,
         seed=0
     )
 
     patch_cielab_20x_8cls_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
+        img_paths=train_20x_img_path,
+        mask_paths=train_20x_mask_path,
         mode="CIELAB",
         name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        stain_normaliser=stain_normaliser,
+        level="pixel",
         transform=train_transform,
         seed=0
     )
 
     patch_bw_20x_8cls_dataset = PatchDataset(
-        imgPaths=train_20x_img_path,
-        maskPaths=train_20x_mask_path,
+        img_paths=train_20x_img_path,
+        mask_paths=train_20x_mask_path,
         mode="BW",
         name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        stain_normaliser=stain_normaliser,
+        level="pixel",
         transform=train_transform,
         seed=0
     )
