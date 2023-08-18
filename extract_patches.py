@@ -203,7 +203,7 @@ def resize_roi_and_masks(roi_arr: np.ndarray, mask: np.ndarray, downsample_facto
 
     return roi_arr, mask
 
-def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str = "", verbose: bool = False):
+def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str = ".", verbose: bool = False):
     """
     Save patches to a given path
     """
@@ -226,7 +226,7 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
     if verbose:
         logging.info(f"save_patches - saved {num_of_patches} patches")
 
-def patchify_and_save(roi_arr: np.ndarray, mask: np.ndarray, save_path: str = "", overlap: bool = True, verbose: bool = False):
+def patchify_and_save(roi_arr: np.ndarray, mask: np.ndarray, save_path: str = ".", overlap: bool = True, verbose: bool = False):
     assert roi_arr.shape[0] == mask.shape[0] and roi_arr.shape[1] == mask.shape[1], "ROI and mask must have the same shape"
     min_dim = min(roi_arr.shape[0], roi_arr.shape[1], 512)
     step = min_dim//2 if overlap else min_dim
