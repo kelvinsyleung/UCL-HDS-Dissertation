@@ -39,7 +39,7 @@ class PatchDataset(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # white thresholding
-        is_majority_white = (img > self.white_threshold).sum() > (img.shape[0] * img.shape[1] * 3)
+        is_majority_white = (img > self.white_threshold).sum() > (img.shape[0] * img.shape[1] * 3) * self.patch_area_threshold
 
         if not is_majority_white:
             try:
