@@ -12,7 +12,7 @@ class PatchDataset(Dataset):
             stain_normaliser: torchstain.normalizers.HENormalizer,
             level: Literal["patch", "pixel"] = "patch",
             patch_area_threshold: int = 0.4,
-            white_threshold: int = 220,
+            white_threshold: int = 230,
             transform=None, seed=0
         ):
         self.imgs = img_paths
@@ -35,11 +35,10 @@ class PatchDataset(Dataset):
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         # print(f"image path: {img_path}, mask path: {mask_path}")
-        
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # white thresholding
-        is_majority_white = (img > self.white_threshold).sum() > (img.shape[0] * img.shape[1] * 3) * self.patch_area_threshold
+        bw_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        is_majority_white = bw_img.mean() > self.white_threshold
 
         if not is_majority_white:
             try:
@@ -47,13 +46,15 @@ class PatchDataset(Dataset):
             except Exception as e:
                 print(f"Error in normalising image: {img_path}")
                 print(e)
-        else:
-            mask = np.zeros_like(mask)
+            else:
+                mask = np.zeros_like(mask)
 
-        if self.mode == "CIELAB":
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        if self.mode == "RGB":
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        elif self.mode == "CIELAB":
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         elif self.mode == "BW":
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            img = bw_img
 
         class_id = self.name_to_class_mapping["-".join(img_path.split("/")[-3].split("-")[:-2])]
 
