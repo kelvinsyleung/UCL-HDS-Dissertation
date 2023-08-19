@@ -39,6 +39,7 @@ class PatchDataset(Dataset):
         # white thresholding
         bw_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         is_majority_white = bw_img.mean() > self.white_threshold
+        print(f"img: {img_path}, Is majority white: {is_majority_white}, mean: {bw_img.mean()}")
 
         if not is_majority_white:
             try:
@@ -46,8 +47,8 @@ class PatchDataset(Dataset):
             except Exception as e:
                 print(f"Error in normalising image: {img_path}")
                 print(e)
-            else:
-                mask = np.zeros_like(mask)
+        else:
+            mask = np.zeros_like(mask)
 
         if self.mode == "RGB":
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
