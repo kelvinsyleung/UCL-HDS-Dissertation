@@ -39,7 +39,6 @@ class PatchDataset(Dataset):
         # white thresholding
         bw_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         is_majority_white = bw_img.mean() > self.white_threshold
-        print(f"img: {img_path}, Is majority white: {is_majority_white}, mean: {bw_img.mean()}")
 
         if not is_majority_white:
             try:
