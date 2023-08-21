@@ -30,10 +30,10 @@ module load openslide/3.4.1/gnu-4.9.2
 module load python3/3.9-gnu-10.2.0
 
 # Install packages
-pip install -q opencv-python pillow matplotlib numpy tqdm patchify geojson openslide-python
+pip install -q extract_requirements.txt
 
 # Run the script
-python /home/rmhisyl/Scratch/diss/extract_patches.py
+python /home/rmhisyl/Scratch/diss/extract_patches.py -p . -r /home/rmhisyl/Scratch/BRACS_WSI/ -a /home/rmhisyl/Scratch/BRACS_WSI_Annotations/
 
 # Copy files back to scratch
 tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR

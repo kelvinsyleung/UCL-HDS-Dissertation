@@ -14,8 +14,8 @@ import geojson
 from patchify import patchify
 import cv2
 
-from log_utils import setup_logging
 from coord_utils import get_relative_coordinates, pad_roi_coordinates
+from log_utils import setup_logging
 
 OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
 if hasattr(os, "add_dll_directory"):

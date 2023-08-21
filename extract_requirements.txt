@@ -1,0 +1,8 @@
+opencv-python
+pillow
+matplotlib
+numpy
+tqdm
+patchify
+geojson
+openslide-python
