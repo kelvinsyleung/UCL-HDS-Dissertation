@@ -14,10 +14,10 @@ Dataset Used: https://www.bracs.icar.cnr.it/
 ### Report Writing
 | Section | Status | Completion Date (Expected Date) |
 |---|---|---|
-| Literature Review | WIP 📝 | (10-8-2023) |
-| Methodology | Planning 📆 | (16-8-2023) |
-| Results | Dependency - Code ⬇️ | (21-8-2023) |
-| Discussion | Dependency - Result ⬆️ | (24-8-2023) |
+| Literature Review | Completed 🙂 | 17-8-2023 |
+| Methodology | Planning 📆 | (23-8-2023) |
+| Results | Dependency - Code ⬇️ | (27-8-2023) |
+| Discussion | Dependency - Result ⬆️ | (30-8-2023) |
 
 ### Experiments
 | Module | Status | Completion Date (Expected Date) |
@@ -25,17 +25,17 @@ Dataset Used: https://www.bracs.icar.cnr.it/
 | Patch Extraction | Completed 🙂 | 28-7-2023 |
 | Data Transformation Pipeline | Completed 🙂 | 21-7-2023 |
 | CNN Classifier - Patch Level | Completed 🙂 | 8-8-2023 |
-| CNN Classifier - Slide Level | WIP 🧑🏻‍💻 | (15-8-2023) |
+| CNN Classifier - Slide Level | Completed 🙂 | 19-8-2023 |
 | Evalutaion Module | WIP 🧑🏻‍💻 | (15-8-2023) |
 
-### High Performance Cluster Run
+### High Performance Cluster / Google Colab Run
 | Work | Status | Completion Date (Expected Date) |
 |---|---|---|
 | Upload Dataset | Completed 🙂 | 1-8-2023 |
 | Job scripts |  Completed 🙂 | 5-8-2023 |
-| Factorial Design | WIP 🧑🏻‍💻 | (8-8-2023) |
-| Sequential Model | Planning 📆 | (10-8-2023) |
-| Adaptive Model | Planning 📆 | (16-8-2023) |
+| Factorial Classifier | WIP 🧑🏻‍💻 | (21-8-2023) |
+| Sequential Model | WIP 🧑🏻‍💻 | (23-8-2023) |
+| Adaptive Model | Planning 📆 | (26-8-2023) |
 
 ## Data Directories structure
 DATA_PATH - BRACS_WSI
@@ -79,25 +79,38 @@ ANNOT_PATH - BRACS_WSI
 ### Download the dataset from BRACS for processing
 The directories structure from BRACS should be identical to above by default. Otherwise, format and align with above.
 
-### Annotation preprocessing
+### QuPath Annotation preprocessing
 1. open QuPath to edit the `qp_annotations_to_json.groovy` script
 2. specify the `ANNOT_PATH` in line 5 `def outputPath = "path/to/BRACS_WSI_Annotations"`
 3. run and generate `.geojson` files from the original `.qpdata` files into the same `ANNOT_PATH`
 
-### Patch Extraction Module
-modify the file `DATA_PATH` and `ANNOT_PATH` to point to the directories with the WSIs and the annotations
+### Python scripts and Notebooks
+Most Python scripts includes required arguments, use `python <script>.py -h` to read the details
+
+#### Patch Level Feature Extraction Module and Slide Level Feature Extraction Module
+use the `-p` or `--project_root` flag to indicate where to export the extracted thumbnails with bboxes
+
+use the `-r` or `--raw_data_folder` flag to indicate where are the BRACS raw data files
+
+use the `-a` or `--annot_folder` flag to indicate where are the processed BRACS annotation files
+
+use the `-t` or `--tile_size` flag to indicate the patch tile size in pixels
+
+use the `-s` or `--step_size` flag to indicate the offset in pixels to extract the next tile
+
 ```python
-python extract_patches.py
+python extract_patches.py -p <project_path>  -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
+python extract_slides.py -p <project_path>  -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
 ```
 
-### Sample patch transform and classifier
+#### Sample patch transformations and augmentations
 use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
 
 ```python
-python patch_transform_showcase.py --project_path <project_path>
+python patch_transform_showcase.py -p <project_path>
 ```
 
-### Patch level UNET
+#### Patch level Classifier (Refactoring)
 use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
 
 use the `-c` or `--color_space` option to indicate the target colour space for transformation (`RGB`, `CIELAB`, `BW`)
@@ -105,5 +118,5 @@ use the `-c` or `--color_space` option to indicate the target colour space for t
 use the `-m` or `--mag` option to indicate the specific magnification of patches used to train the model (`20x`, `40x`)
 
 ```python
-python train_unet.py --project_path <project_path> --color_space <color_space> --mag <magnification>
+python train_unet.py --project_root --color_space <color_space> --mag <magnification>
 ```
