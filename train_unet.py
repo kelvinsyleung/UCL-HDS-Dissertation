@@ -182,8 +182,8 @@ if __name__ == "__main__":
         model, 8, device,
         train_batches, valid_batches,
         EPOCHS, criterion, optimizer,
-        eval_fn,
-        set_name, save_interval=50, save_path=MODEL_SAVEPATH
+        set_name, eval_fn, model_type="segmentation",
+        save_interval=50, save_path=MODEL_SAVEPATH
     )
     torch.save(
         {
