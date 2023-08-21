@@ -37,34 +37,34 @@ def get_scaled_img_and_rois(
     Get scaled image and rois from slide and bbox list at given downsample level, default as max downsample.
     """
     roi_bboxes = np.array(list(map(lambda x: x["coordinates"], bbox_list)))
-    thumbnail_arr = np.array(slide.get_thumbnail(slide.level_dimensions[level]))
+    slide_arr = np.array(slide.get_thumbnail(slide.level_dimensions[level]))
     
     slide_width, slide_height = slide.dimensions
-    height, width = thumbnail_arr.shape[:2]
+    height, width = slide_arr.shape[:2]
     width_ratio =  width / slide_width
     height_ratio = height / slide_height
 
     scaled_bboxes = roi_bboxes * np.array([width_ratio, height_ratio])
-    return thumbnail_arr, scaled_bboxes
+    return slide_arr, scaled_bboxes
 
 def get_extract_area_coord(
-        thumbnail_arr: np.ndarray,
+        slide_arr: np.ndarray,
         scaled_roi_bboxes: np.ndarray,
         patch_size: int,
         step_size: int
     ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
-    Get the coordinates of the area to extract from the thumbnail.
+    Get the coordinates of the area to extract from the slide.
     """
     # get the min and max x and y coordinates among the ROIs
     min_bbox_x, min_bbox_y = scaled_roi_bboxes.reshape(-1, 2).min(axis=0).astype(int)
     max_bbox_x, max_bbox_y = scaled_roi_bboxes.reshape(-1, 2).max(axis=0).astype(int)
 
     # extend the min and max coordinates value to create the slide extraction area
-    height, width = thumbnail_arr.shape[:2]
+    height, width = slide_arr.shape[:2]
 
     # first, add 30 pixel padding to the min and max coordinates
-    # check if the the points are within the bounds of thumbnail
+    # check if the the points are within the bounds of slide
     extract_min_x = max(0, min_bbox_x - 30)
     extract_min_y = max(0, min_bbox_y - 30)
     extract_max_x = min(width, max_bbox_x + 30)
@@ -82,7 +82,7 @@ def get_extract_area_coord(
     return extract_min_coord, extract_max_coord
 
 def patchify_area_and_rois(
-        thumbnail_arr: np.ndarray,
+        slide_arr: np.ndarray,
         extract_area_coord: Tuple[Tuple[int, int], Tuple[int, int]],
         patch_size: int, step_size: int, scaled_bboxes: np.ndarray
     ) -> List[List[Dict[str, Union[np.ndarray, List[np.ndarray]]]]]:
@@ -90,7 +90,7 @@ def patchify_area_and_rois(
     Patchify the slide image and retrieve the relative coordinates of the bboxes in the patchified images
     """
     (extract_min_x, extract_min_y), (extract_max_x, extract_max_y) = extract_area_coord
-    extract_area_arr = thumbnail_arr[extract_min_y:extract_max_y, extract_min_x:extract_max_x, :]
+    extract_area_arr = slide_arr[extract_min_y:extract_max_y, extract_min_x:extract_max_x, :]
 
     # patchify the slide image, each patch is 512x512, step is 256
     slide_patches = patchify(extract_area_arr, (patch_size, patch_size, 3), step=step_size)
@@ -168,10 +168,10 @@ def save_obj_detect_patch_and_roi(
     if verbose:
         logging.info(f"save_obj_detect_patch_and_roi - Saved patches image and bbox json to {save_path}")
 
-def create_rois_dataset(annot_path: str, thumbnail_folder: str, data_folder: str, set_type: str, patch_size: int, step_size: int):
+def create_rois_dataset(annot_path: str, slide_folder: str, data_folder: str, set_type: str, patch_size: int, step_size: int):
     file_id = annot_path.split("/")[-1].split(".")[0]
     # create if not exists
-    if not f"{thumbnail_folder}/{set_type}/{file_id}" in glob.glob(f"{thumbnail_folder}/{set_type}/{file_id}"):
+    if not f"{slide_folder}/{set_type}/{file_id}" in glob.glob(f"{slide_folder}/{set_type}/{file_id}"):
         logging.info(f"create_roi_dataset - processing: {file_id}")
         wsi_file_paths = glob.glob(f"{data_folder}/{set_type}/**/{file_id}.svs", recursive=True)
 
@@ -181,15 +181,15 @@ def create_rois_dataset(annot_path: str, thumbnail_folder: str, data_folder: str
                 annotations = geojson.load(open(annot_path))
                 bbox_list = create_bbox_list(annotations)
 
-                thumbnail_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
+                slide_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
 
-                Path(f"{thumbnail_folder}/{set_type}").mkdir(parents=True, exist_ok=True)
+                Path(f"{slide_folder}/{set_type}").mkdir(parents=True, exist_ok=True)
                 patch_to_bboxes_list = patchify_area_and_rois(
-                    thumbnail_arr,
-                    get_extract_area_coord(thumbnail_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
+                    slide_arr,
+                    get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
                     PATCH_SIZE, STEP_SIZE, scaled_bboxes
                 )
-                save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{thumbnail_folder}/{set_type}/{file_id}")
+                save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{slide_folder}/{set_type}/{file_id}")
             except Exception as e:
                 logging.exception(f"create_roi_dataset - failed to process {file_id}")
                 raise e
@@ -198,7 +198,7 @@ def create_rois_dataset(annot_path: str, thumbnail_folder: str, data_folder: str
             
         gc.collect()
     else:
-        logging.info(f"create_roi_dataset - {thumbnail_folder}/train/{file_id} already exists")
+        logging.info(f"create_roi_dataset - {slide_folder}/train/{file_id} already exists")
 
 if __name__ == "__main__":
     setup_logging()
@@ -215,14 +215,13 @@ if __name__ == "__main__":
     PROJECT_ROOT = args.project_root
     RAW_DATA_FOLDER_PATH = args.raw_data_folder
     ANNOT_PATH = args.annot_folder
-    PATCH_PATH = f"{PROJECT_ROOT}/data/patches"
-    THUMB_PATH = f"{PROJECT_ROOT}/data/thumbnail_patches"
+    SLIDE_PATH = f"{PROJECT_ROOT}/data/slide_patches"
     OUTPUT_PATH = f"{PROJECT_ROOT}/output/"
-    OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots"
+    OUTPUT_PLOT_PATH = f"{OUTPUT_PATH}/plots/extract_slides"
     PATCH_SIZE = args.tile_size
     STEP_SIZE = args.step_size
 
-    Path(PATCH_PATH).mkdir(parents=True, exist_ok=True)
+    Path(SLIDE_PATH).mkdir(parents=True, exist_ok=True)
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
 
     slide = openslide.OpenSlide(f"{RAW_DATA_FOLDER_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
@@ -236,16 +235,16 @@ if __name__ == "__main__":
     annotations = geojson.load(open(annotation_file))
     bbox_list = create_bbox_list(annotations)
 
-    # get thumbnail and scaled rois
-    thumbnail_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
+    # get slide and scaled rois
+    slide_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
 
-    # draw rectangle on the thumbnail
-    thumbnail_plot_arr = thumbnail_arr.copy()
+    # draw rectangle on the slide
+    slide_plot_arr = slide_arr.copy()
 
     for scaled_roi_bbox in scaled_bboxes:
         min_coord, max_coord = scaled_roi_bbox
         cv2.rectangle(
-            thumbnail_plot_arr,
+            slide_plot_arr,
             min_coord.astype(int),
             max_coord.astype(int),
             (0, 0, 0),
@@ -253,10 +252,10 @@ if __name__ == "__main__":
         )
 
     # get an area to extract based on the scaled rois
-    (extract_min_x, extract_min_y), (extract_max_x, extract_max_y) = get_extract_area_coord(thumbnail_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE)
+    (extract_min_x, extract_min_y), (extract_max_x, extract_max_y) = get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE)
 
     fig = plt.figure(figsize=(20, 20))
-    plt.imshow(thumbnail_plot_arr[extract_min_y:extract_max_y, extract_min_x:extract_max_x, :])
+    plt.imshow(slide_plot_arr[extract_min_y:extract_max_y, extract_min_x:extract_max_x, :])
     plt.title("Sample Extract Area with ROIs")
     # draw lines at 256 pixel intervals vertically and horizontally to indictate the 256x256 patches
     for i in range(0, extract_max_x-extract_min_x, STEP_SIZE):
@@ -270,21 +269,21 @@ if __name__ == "__main__":
 
     # patchify the slide image and get the relative coordinates of the bboxes in the patchified images
     patch_to_bboxes_list = patchify_area_and_rois(
-        thumbnail_arr,
-        get_extract_area_coord(thumbnail_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
+        slide_arr,
+        get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
         PATCH_SIZE, STEP_SIZE, scaled_bboxes
     )
 
     # save the patches and rois
-    save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{THUMB_PATH}/sample")
-    logging.info(f"main - saved sample patches and roi bboxes to {THUMB_PATH}/sample")
+    save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{SLIDE_PATH}/sample")
+    logging.info(f"main - saved sample patches and roi bboxes to {SLIDE_PATH}/sample")
 
     # plot a single patch and its rois
-    sample_slide_patch_plot_arr = cv2.imread(f"{THUMB_PATH}/sample/patch/0_0.png")
+    sample_slide_patch_plot_arr = cv2.imread(f"{SLIDE_PATH}/sample/patch/0_0.png")
     sample_slide_patch_plot_arr = cv2.cvtColor(sample_slide_patch_plot_arr, cv2.COLOR_BGR2RGB)
 
     # draw rectangle on the patch copy
-    for annot in np.load(f"{THUMB_PATH}/sample/roi/0_0.npy"):
+    for annot in np.load(f"{SLIDE_PATH}/sample/roi/0_0.npy"):
         cv2.rectangle(
             sample_slide_patch_plot_arr,
             annot[0].astype(int),
@@ -309,7 +308,7 @@ if __name__ == "__main__":
     logging.info("main - start processing train set")
     for train_annot_path in train_set:
         try:
-            create_rois_dataset(train_annot_path, THUMB_PATH, RAW_DATA_FOLDER_PATH, "train", PATCH_SIZE, STEP_SIZE)
+            create_rois_dataset(train_annot_path, SLIDE_PATH, RAW_DATA_FOLDER_PATH, "train", PATCH_SIZE, STEP_SIZE)
         except:
             file_id = train_annot_path.split("/")[-1].split(".")[0]
             with open(failed_file_path, "a+") as f:
@@ -318,7 +317,7 @@ if __name__ == "__main__":
     logging.info("main - start processing validation set")
     for val_annot_path in val_set:
         try:
-            create_rois_dataset(val_annot_path, THUMB_PATH, RAW_DATA_FOLDER_PATH, "val", PATCH_SIZE, STEP_SIZE)
+            create_rois_dataset(val_annot_path, SLIDE_PATH, RAW_DATA_FOLDER_PATH, "val", PATCH_SIZE, STEP_SIZE)
         except:
             file_id = val_annot_path.split("/")[-1].split(".")[0]
             with open(failed_file_path, "a+") as f:

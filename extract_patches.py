@@ -278,7 +278,7 @@ if __name__ == "__main__":
     ANNOT_PATH = args.annot_folder
     PATCH_PATH = f"{PROJECT_ROOT}/data/roi_patches"
     OUTPUT_PATH = f"{PROJECT_ROOT}/output/"
-    OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots/extract_patches"
+    OUTPUT_PLOT_PATH = f"{OUTPUT_PATH}/plots/extract_patches"
     PATCH_SIZE = args.tile_size
     STEP_SIZE = args.step_size
 
