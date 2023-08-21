@@ -4,9 +4,8 @@ import os
 from pathlib import Path
 import glob
 import gc
-import random
-import logging
 from datetime import datetime
+import logging
 
 from PIL import Image
 import numpy as np
