@@ -56,11 +56,9 @@ if __name__ == "__main__":
     PATCH_PATH = f"{DATA_PATH}/patches"
 
     # relative to script execution path
-    OUTPUT_PLOT_PATH = "./output/plots"
-    OUTPUT_MODEL_PATH = "./output/models"
+    OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots/patch_transform_showcase"
 
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
-    Path(OUTPUT_MODEL_PATH).mkdir(parents=True, exist_ok=True)
 
     train_sample_patches_paths = glob.glob(PATCH_PATH + "/train_sample/*")
     test_img_path = ""
@@ -77,7 +75,9 @@ if __name__ == "__main__":
         plt.imshow(img)
         plt.imshow(mask, alpha=0.5)
         plt.savefig(f"{OUTPUT_PLOT_PATH}/read_patch_example.png")
+        plt.close()
         break
+    logging.info(f"main - saved read patch example to {OUTPUT_PLOT_PATH}/read_patch_example.png")
 
     test_img = cv2.imread(test_img_path, cv2.IMREAD_UNCHANGED)
     test_img = cv2.cvtColor(test_img, cv2.COLOR_BGRA2RGB)
@@ -99,6 +99,7 @@ if __name__ == "__main__":
     ax[1].imshow(cielab_test_img)
     ax[2].imshow(bw_test_img, cmap="gray")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/colorspace_example.png")
+    plt.close()
     logging.info(f"main - saved colorspace example plot to {OUTPUT_PLOT_PATH}/colorspace_example.png")
 
     fig, ax = plt.subplots(1, 2, figsize=(15, 15))
