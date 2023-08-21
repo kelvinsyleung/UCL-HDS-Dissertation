@@ -171,7 +171,7 @@ def save_obj_detect_patch_and_roi(
 def create_rois_dataset(annot_path: str, thumbnail_folder: str, data_folder: str, set_type: str, patch_size: int, step_size: int):
     file_id = annot_path.split("/")[-1].split(".")[0]
     # create if not exists
-    if not f"{thumbnail_folder}/{set_type}/{file_id}" in glob.glob(f"{THUMB_PATH}/{set_type}/{file_id}"):
+    if not f"{thumbnail_folder}/{set_type}/{file_id}" in glob.glob(f"{thumbnail_folder}/{set_type}/{file_id}"):
         logging.info(f"create_roi_dataset - processing: {file_id}")
         wsi_file_paths = glob.glob(f"{data_folder}/{set_type}/**/{file_id}.svs", recursive=True)
 
@@ -227,9 +227,9 @@ if __name__ == "__main__":
 
     slide = openslide.OpenSlide(f"{RAW_DATA_FOLDER_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
 
-    logging.info(f"levels: {slide.level_count}")
-    logging.info(f"level dimensions {slide.level_dimensions}")
-    logging.info(f"level downsamples {slide.level_downsamples}")
+    logging.info(f"main - levels: {slide.level_count}")
+    logging.info(f"main - level dimensions {slide.level_dimensions}")
+    logging.info(f"main - level downsamples {slide.level_downsamples}")
 
     # get annotations
     annotation_file = f"{ANNOT_PATH}/train/Group_AT/Type_ADH/BRACS_1486.geojson"
@@ -265,7 +265,8 @@ if __name__ == "__main__":
         plt.axhline(i, color="r")
 
     plt.savefig(f"{OUTPUT_PLOT_PATH}/extract_slide_cropping_sample.png")
-
+    plt.close()
+    logging.info(f"main - saved extract slide cropping sample to {OUTPUT_PLOT_PATH}/extract_slide_cropping_sample.png")
 
     # patchify the slide image and get the relative coordinates of the bboxes in the patchified images
     patch_to_bboxes_list = patchify_area_and_rois(
@@ -276,6 +277,7 @@ if __name__ == "__main__":
 
     # save the patches and rois
     save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{THUMB_PATH}/sample")
+    logging.info(f"main - saved sample patches and roi bboxes to {THUMB_PATH}/sample")
 
     # plot a single patch and its rois
     sample_slide_patch_plot_arr = cv2.imread(f"{THUMB_PATH}/sample/patch/0_0.png")
@@ -294,13 +296,15 @@ if __name__ == "__main__":
     plt.imshow(sample_slide_patch_plot_arr)
     plt.title("Sample Patch with ROIs")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/extract_slide_patch_sample.png")
-
-    failed_file_path = Path(f"{OUTPUT_PATH}/failed_slide_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
+    plt.close()
+    logging.info(f"main - saved extract slide patch sample to {OUTPUT_PLOT_PATH}/extract_slide_patch_sample.png")
 
     # get all annotations
     train_set = glob.glob(f"{ANNOT_PATH}/train/**/*.geojson", recursive=True)
     val_set = glob.glob(f"{ANNOT_PATH}/val/**/*.geojson", recursive=True)
     test_set = glob.glob(f"{ANNOT_PATH}/test/**/*.geojson", recursive=True)
+
+    failed_file_path = Path(f"{OUTPUT_PATH}/failed_slide_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
 
     logging.info("main - start processing train set")
     for train_annot_path in train_set:
