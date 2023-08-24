@@ -14,7 +14,7 @@ import geojson
 from patchify import patchify
 import cv2
 
-from coord_utils import get_relative_coordinates, pad_roi_coordinates
+from coord_utils import get_bbox_by_shape, get_relative_coordinates, pad_roi_coordinates
 from log_utils import setup_logging
 
 OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
@@ -24,29 +24,6 @@ if hasattr(os, "add_dll_directory"):
         import openslide
 else:
     import openslide
-
-def get_bbox_by_shape(coordinates: List, shape_type: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Given a list of coordinates, return the bounding box
-
-    returns: (x_min, y_min), (x_max, y_max)
-    """
-
-    coordinates_arr = np.array([])
-    if shape_type == "Polygon":
-        # first coordinate is the outer polygon, the rest are holes
-        coordinates_arr = np.array(coordinates[0]).squeeze()
-    elif shape_type == "MultiPolygon":
-        for polygon in coordinates:
-            coordinates_arr = np.array(polygon[0]).squeeze()
-            if coordinates_arr.shape[0] > 4:
-                break
-    else:
-        raise ValueError(f"Unknown shape type: {shape_type}")
-    
-    min_coord = np.floor(np.min(coordinates_arr, axis=0)).astype(int)
-    max_coord = np.ceil(np.max(coordinates_arr, axis=0)).astype(int)
-    return tuple(min_coord), tuple(max_coord)
 
 def create_bbox_list(annotations: Dict) -> List[Dict[str, Union[str, Tuple[np.ndarray, np.ndarray]]]]:
     """
