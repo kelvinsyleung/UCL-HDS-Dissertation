@@ -183,12 +183,14 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
         for j in range(patches.shape[1]):
             # save patch
             patch = patches[i, j, 0]
+            patch = cv2.resize(roi_arr, (256, 256))
             patch = Image.fromarray(patch)
             os.makedirs(f"{save_path}/patch", exist_ok=True)
             patch.save(f"{save_path}/patch/{i}_{j}.png")
 
             # save mask
             mask = mask_patches[i, j]
+            mask = cv2.resize(mask, (256, 256))
             mask = Image.fromarray(np.stack((mask,)*3, axis=-1).astype(np.uint8))
             
             os.makedirs(f"{save_path}/mask", exist_ok=True)
@@ -197,15 +199,23 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
     if verbose:
         logging.info(f"save_patches - saved {num_of_patches} patches")
 
-def patchify_and_save(roi_arr: np.ndarray, mask: np.ndarray, save_path: str = ".", overlap: bool = True, verbose: bool = False):
+def patchify_and_save(
+        roi_arr: np.ndarray, mask: np.ndarray,
+        patch_size: int, step_size: int,
+        save_path: str = ".", verbose: bool = False
+    ):
+    """
+    Patchify a ROI and its mask and save them to a given path
+    """
     assert roi_arr.shape[0] == mask.shape[0] and roi_arr.shape[1] == mask.shape[1], "ROI and mask must have the same shape"
-    min_dim = min(roi_arr.shape[0], roi_arr.shape[1], 512)
-    step = min_dim//2 if overlap else min_dim
-    roi_patches = patchify(roi_arr, (min_dim, min_dim, 3), step=step)
-    mask_patches = patchify(mask, (min_dim, min_dim), step=step)
+    roi_patches = patchify(roi_arr, (patch_size, patch_size, 3), step=step_size)
+    mask_patches = patchify(mask, (patch_size, patch_size), step=step_size)
     save_patches(roi_patches, mask_patches, save_path=save_path, verbose=verbose)
 
 def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str, set_type: str, patch_size: int, step_size: int):
+    """
+    Given an annotation file, create patches from the corresponding WSI and save them to a given path
+    """
     file_id = annot_path.split("/")[-1].split(".")[0]
 
     # create if not exists
@@ -223,10 +233,16 @@ def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str,
 
                 for idx, (roi, mask) in enumerate(zip(rois, masks)):
                     roi_arr = np.array(roi["image"])
-                    patchify_and_save(roi_arr, mask, save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-40x", overlap=False)
+                    patchify_and_save(
+                        roi_arr, mask, patch_size, step_size,
+                        save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-40x",
+                    )
 
                     roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
-                    patchify_and_save(roi_arr, mask, save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-20x", overlap=False)
+                    patchify_and_save(
+                        roi_arr, mask, patch_size//2, step_size//2,
+                        save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-20x",
+                    )
 
             except Exception as e:
                 logging.exception(f"create_patches_dataset - fail to process {file_id}:")
@@ -360,8 +376,7 @@ if __name__ == "__main__":
     # get all annotations
     train_set = glob.glob(f"{ANNOT_PATH}/train/**/*.geojson", recursive=True)
     val_set = glob.glob(f"{ANNOT_PATH}/val/**/*.geojson", recursive=True)
-    test_set = glob.glob(f"{ANNOT_PATH}/test/**/*.geojson", recursive=True)
-
+    
     failed_file_path = Path(f"{OUTPUT_PATH}/failed_preprocess_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
 
     logging.info("main - start processing train set")   
