@@ -1,0 +1,11 @@
+numpy
+matplotlib
+patchify
+shapely
+networkx
+geojson
+opencv-python
+openslide-python
+torch
+torchvision
+albumentations

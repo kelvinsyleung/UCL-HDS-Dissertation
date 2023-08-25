@@ -1,8 +1,7 @@
-opencv-python
 pillow
-matplotlib
 numpy
-tqdm
-patchify
+matplotlib
 geojson
+patchify
+opencv-python
 openslide-python

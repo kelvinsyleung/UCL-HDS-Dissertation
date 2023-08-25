@@ -3,5 +3,7 @@ matplotlib
 pillow
 opencv-python
 tqdm
+torchvision
 segmentation-models-pytorch
 albumentations
+torchstain
