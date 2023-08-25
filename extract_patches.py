@@ -49,13 +49,16 @@ def get_annotated_rois(
     ) -> List[Dict[str, Union[str, np.ndarray]]]:
     """
     Given a list of bounding boxes, return a list of ROI images and their classifications
+    ROI images are padded by double the patch_size and step_size at max resolution
+    so that the downampled ROI images can be produced to simulate a lower magnification
 
     returns: list of ROI images and their classifications
     """
     rois = []
     for bbox in bboxes:
         min_coord, max_coord = bbox["coordinates"][0], bbox["coordinates"][1]
-        min_coord, max_coord = pad_roi_coordinates(min_coord, max_coord, slide.dimensions, patch_size, step_size)
+        # pad the coordinates by double the patch_size and step_size
+        min_coord, max_coord = pad_roi_coordinates(min_coord, max_coord, slide.dimensions, patch_size*2, step_size*2)
 
         roi = slide.read_region(
             min_coord,
@@ -183,14 +186,14 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
         for j in range(patches.shape[1]):
             # save patch
             patch = patches[i, j, 0]
-            patch = cv2.resize(roi_arr, (256, 256))
+            patch = cv2.resize(patch, (256, 256))
             patch = Image.fromarray(patch)
             os.makedirs(f"{save_path}/patch", exist_ok=True)
             patch.save(f"{save_path}/patch/{i}_{j}.png")
 
             # save mask
             mask = mask_patches[i, j]
-            mask = cv2.resize(mask, (256, 256))
+            mask = cv2.resize(mask.astype(np.uint8), (256, 256))
             mask = Image.fromarray(np.stack((mask,)*3, axis=-1).astype(np.uint8))
             
             os.makedirs(f"{save_path}/mask", exist_ok=True)
@@ -240,7 +243,7 @@ def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str,
 
                     roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
                     patchify_and_save(
-                        roi_arr, mask, patch_size//2, step_size//2,
+                        roi_arr, mask, patch_size, step_size,
                         save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-20x",
                     )
 
@@ -302,10 +305,16 @@ if __name__ == "__main__":
     # patchify and save training sample patches 1
     for idx, (roi, mask) in enumerate(zip(rois, masks)):
         # sample 40x and 20x patches
-        patchify_and_save(np.array(roi["image"]), mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-40x")
+        patchify_and_save(
+            np.array(roi["image"]), mask, PATCH_SIZE, STEP_SIZE,
+            save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-40x"
+        )
 
         roi_arr, mask = resize_roi_and_masks(np.array(roi["image"]), mask, downsample_factor=2)
-        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-20x")
+        patchify_and_save(
+            roi_arr, mask, PATCH_SIZE, STEP_SIZE,
+            save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-20x"
+        )
 
     logging.info("main - saved BRACS_1486 patches")
 
