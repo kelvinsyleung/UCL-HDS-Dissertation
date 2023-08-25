@@ -285,4 +285,8 @@ def pad_roi_coordinates(
                 new_max_coord[1] + height_pad
             )
 
+    # cast to int
+    new_min_coord = tuple(map(int, new_min_coord))
+    new_max_coord = tuple(map(int, new_max_coord))
+
     return new_min_coord, new_max_coord
