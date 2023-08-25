@@ -181,11 +181,20 @@ def create_rois_dataset(annot_path: str, slide_folder: str, data_folder: str, se
                 bbox_list = create_bbox_list(annotations)
 
                 slide_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
+                slide_arr = np.pad(
+                    slide_arr,
+                    (
+                        (0, STEP_SIZE - slide_arr.shape[0] % STEP_SIZE),
+                        (0, STEP_SIZE - slide_arr.shape[1] % STEP_SIZE),
+                        (0, 0)
+                    ),
+                    constant_values=255
+                )
 
                 Path(f"{slide_folder}/{set_type}").mkdir(parents=True, exist_ok=True)
                 patch_to_bboxes_list = patchify_area_and_rois(
                     slide_arr,
-                    get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
+                    ((0, 0), slide_arr.shape[:2]),
                     PATCH_SIZE, STEP_SIZE, scaled_bboxes
                 )
                 save_obj_detect_patch_and_roi(patch_to_bboxes_list, save_path=f"{slide_folder}/{set_type}/{file_id}")
@@ -206,8 +215,8 @@ if __name__ == "__main__":
     argParser.add_argument("-p", "--project_root", help="project root path to export the extracted patch data, e.g. -p /path/to/project/", type=str, default=".", required=True)
     argParser.add_argument("-r", "--raw_data_folder", help="raw data folder path, e.g. -r /path/to/raw", type=str, required=True)
     argParser.add_argument("-a", "--annot_folder", help="annotation folder path, e.g. -a /path/to/annot", type=str, required=True)
-    argParser.add_argument("-t", "--tile_size", help="tile size, e.g. -t 512", type=int, default=256)
-    argParser.add_argument("-s", "--step_size", help="step size, e.g. -s 512", type=int, default=128)
+    argParser.add_argument("-t", "--tile_size", help="tile size, e.g. -t 512", type=int, default=512)
+    argParser.add_argument("-s", "--step_size", help="step size, e.g. -s 512", type=int, default=256)
     args = argParser.parse_args()
 
     # absolute path for loading patches
@@ -236,6 +245,15 @@ if __name__ == "__main__":
 
     # get slide and scaled rois
     slide_arr, scaled_bboxes = get_scaled_img_and_rois(slide, bbox_list, level=-1)
+    slide_arr = np.pad(
+        slide_arr,
+        (
+            (0, STEP_SIZE - slide_arr.shape[0] % STEP_SIZE),
+            (0, STEP_SIZE - slide_arr.shape[1] % STEP_SIZE),
+            (0, 0)
+        ),
+        constant_values=255
+    )
 
     # draw rectangle on the slide
     slide_plot_arr = slide_arr.copy()
@@ -250,17 +268,14 @@ if __name__ == "__main__":
             2
         )
 
-    # get an area to extract based on the scaled rois
-    (extract_min_x, extract_min_y), (extract_max_x, extract_max_y) = get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE)
-
     fig = plt.figure(figsize=(20, 20))
-    plt.imshow(slide_plot_arr[extract_min_y:extract_max_y, extract_min_x:extract_max_x, :])
+    plt.imshow(slide_plot_arr)
     plt.title("Sample Extract Area with ROIs")
     # draw lines at 256 pixel intervals vertically and horizontally to indictate the 256x256 patches
-    for i in range(0, extract_max_x-extract_min_x, STEP_SIZE):
-        plt.axvline(i, color="r")
-    for i in range(0, extract_max_y-extract_min_y, STEP_SIZE):
-        plt.axhline(i, color="r")
+    for i in range(0, slide_plot_arr.shape[1], STEP_SIZE):
+        plt.axvline(i, color="black")
+    for i in range(0, slide_plot_arr.shape[0], STEP_SIZE):
+        plt.axhline(i, color="black")
 
     plt.savefig(f"{OUTPUT_PLOT_PATH}/extract_slide_cropping_sample.png")
     plt.close()
@@ -269,7 +284,7 @@ if __name__ == "__main__":
     # patchify the slide image and get the relative coordinates of the bboxes in the patchified images
     patch_to_bboxes_list = patchify_area_and_rois(
         slide_arr,
-        get_extract_area_coord(slide_arr, scaled_bboxes, PATCH_SIZE, STEP_SIZE),
+        ((0, 0), slide_arr.shape[:2]),
         PATCH_SIZE, STEP_SIZE, scaled_bboxes
     )
 
@@ -300,7 +315,6 @@ if __name__ == "__main__":
     # get all annotations
     train_set = glob.glob(f"{ANNOT_PATH}/train/**/*.geojson", recursive=True)
     val_set = glob.glob(f"{ANNOT_PATH}/val/**/*.geojson", recursive=True)
-    test_set = glob.glob(f"{ANNOT_PATH}/test/**/*.geojson", recursive=True)
 
     failed_file_path = Path(f"{OUTPUT_PATH}/failed_slide_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
 
