@@ -1,5 +1,6 @@
 from typing import Literal, Union, Dict, List, Tuple
 import random
+from pathlib import Path
 import logging
 
 import matplotlib.pyplot as plt
@@ -17,6 +18,37 @@ def forward_step(
         metrics: Dict[str, float], forward_type: Literal["train", "val"],
         data: torch.Tensor, targets: Union[torch.Tensor, Tuple[Dict[str, torch.Tensor]]]
     ):
+    """
+    Forward step of the training loop.
+
+    Parameters
+    ----------
+        model: nn.Module
+            The model to train.
+        num_classes: int
+            The number of classes in the dataset.
+        device: torch.device
+            The device to use for training.
+        criterion: torch.nn.Module
+            The loss function to use.
+        eval_fn: callable
+            The evaluation function to use.
+        model_type: str
+            The type of model. e.g. "classification", "detection", or "segmentation".
+        metrics: Dict[str, float]
+            The metrics dictionary to update.
+        forward_type: Literal["train", "val"]
+            The type of forward step. Either "train" or "val".
+        data: torch.Tensor
+            The data to forward pass.
+        targets: Union[torch.Tensor, Tuple[Dict[str, torch.Tensor]]]
+            The targets to forward pass.
+
+    Returns
+    -------
+        loss: torch.Tensor
+            The loss of the forward pass.
+    """
     if model_type != "detection":
         data = data.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
@@ -47,6 +79,30 @@ def train_one_epoch(
         criterion: torch.nn.Module, optimizer: torch.optim.Optimizer,
         eval_fn: callable, model_type: str, metrics: Dict[str, float]
     ):
+    """
+    Train the model for one epoch.
+    
+    Parameters
+    ----------
+        model: nn.Module
+            The model to train.
+        num_classes: int
+            The number of classes in the dataset.
+        device: torch.device
+            The device to use for training.
+        train_batches: DataLoader
+            The training data loader.
+        criterion: torch.nn.Module
+            The loss function to use.
+        optimizer: torch.optim.Optimizer
+            The optimizer to use.
+        eval_fn: callable
+            The evaluation function to use.
+        model_type: str
+            The type of model. e.g. "classification", "detection", or "segmentation".
+        metrics: Dict[str, float]
+            The metrics dictionary to update.
+    """
     for data, targets in tqdm(train_batches):
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -68,6 +124,28 @@ def evaluate_one_epoch(
         criterion: torch.nn.Module,
         eval_fn: callable, model_type: str, metrics: Dict[str, float]
     ):
+    """
+    Evaluate the model for one epoch.
+
+    Parameters
+    ----------
+        model: nn.Module
+            The model to train.
+        num_classes: int
+            The number of classes in the dataset.
+        device: torch.device
+            The device to use for training.
+        valid_batches: DataLoader
+            The validation data loader.
+        criterion: torch.nn.Module
+            The loss function to use.
+        eval_fn: callable
+            The evaluation function to use.
+        model_type: str
+            The type of model. e.g. "classification", "detection", or "segmentation".
+        metrics: Dict[str, float]
+            The metrics dictionary to update.
+    """
     with torch.no_grad():
         for data, targets in valid_batches:
             # forward
@@ -82,6 +160,46 @@ def save_model(
         history: Dict[str, List], best_model_val_loss: float, best_model_val_score: float, best_model_epoch: int,
         avg_val_loss: float, avg_val_score: float, epoch: int
     ):
+    """
+    Save the model.
+
+    Parameters
+    ----------
+        model: nn.Module
+            The model to save.
+        optimizer: torch.optim.Optimizer
+            The optimizer to save.
+        set_name: str
+            The name of the dataset.
+        save_interval: Union[int, None]
+            The interval at which to save extra models. None to save only the best model.
+        save_path: str
+            The path to save the models.
+        history: Dict[str, List]
+            The training history.
+        best_model_val_loss: float
+            The best model validation loss.
+        best_model_val_score: float
+            The best model validation score.
+        best_model_epoch: int
+            The epoch at which the best model was saved.
+        avg_val_loss: float
+            The average validation loss for the current epoch.
+        avg_val_score: float
+            The average validation score for the current epoch.
+        epoch: int
+            The current epoch.
+
+    Returns
+    -------
+        best_model_val_loss: float
+            The best model validation loss.
+        best_model_val_score: float
+            The best model validation score.
+        best_model_epoch: int
+            The epoch at which the best model was saved.
+    """
+    Path(save_path).mkdir(parents=True, exist_ok=True)
     # regular save
     if save_interval and (epoch+1) % save_interval == 0:
         torch.save(
@@ -151,6 +269,11 @@ def run_train_loop(
             The interval at which to save extra models. None to save only the best model.
         save_path: str
             The path to save the models.
+
+    Returns
+    -------
+        history: Dict[str, List]
+            The training history.
     """
     model.to(device)
 
