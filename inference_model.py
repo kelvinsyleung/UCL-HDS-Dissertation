@@ -5,14 +5,18 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
+import geojson
 from patchify import patchify
-from shapely.geometry import box, Polygon
+from shapely.geometry import shape, Polygon
 from shapely.ops import unary_union
+import networkx as nx
 
 import cv2
 import torch
 import torch.nn as nn
 import torchvision
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 from coord_utils import get_absolute_coordinates, pad_roi_coordinates
 from log_utils import setup_logging
@@ -32,11 +36,35 @@ class InferenceModel:
         self, classifier_model: nn.Module, object_detection_model: nn.Module, device: str,
         slide_patch_size: int = 512, roi_patch_size: int = 512,
         white_threshold: float = 230,
-        box_nms_threshold: float = 0.1,
-        box_score_threshold: float = 0.1,
-        box_area_threshold: float = 100,
-        num_classes: int = 3
+        box_nms_threshold: float = 1.0,
+        box_score_threshold: float = 0.04,
+        box_area_threshold: float = 50,
+        num_classes: int = 4
     ):
+        """
+        Parameters
+        ----------
+            classifier_model: nn.Module
+                The classifier model to use.
+            object_detection_model: nn.Module
+                The object detection model to use.
+            device: str
+                The device to run inference on.
+            slide_patch_size: int
+                The size of the patches to extract from the slide.
+            roi_patch_size: int
+                The size of the patches to extract from the bounding boxes.
+            white_threshold: float
+                The threshold to use to flag patches that are majority white.
+            box_nms_threshold: float
+                The threshold to use for non-maximum suppression.
+            box_score_threshold: float
+                The threshold to use to filter out boxes with low scores.
+            box_area_threshold: float
+                The threshold to use to filter out boxes with small areas.
+            num_classes: int
+                The number of classes. Currently only supports 4 classes. 0 represents background.
+        """
         self.object_detection_model = object_detection_model
         self.classifier_model = classifier_model
         self.slide_patch_size = slide_patch_size
@@ -47,6 +75,16 @@ class InferenceModel:
         self.box_area_threshold = box_area_threshold
         self.device = device
         self.num_classes = num_classes
+
+        self.roi_transform = A.Compose([
+            A.Resize(512, 512),
+            ToTensorV2()
+        ])
+        self.patch_transform = A.Compose([
+            A.Resize(256, 256),
+            ToTensorV2()
+        ])
+
         setup_logging()
     
     def predict_proba(
@@ -86,21 +124,24 @@ class InferenceModel:
         logging.info(f"InferenceModel.predict - Flagged majority white patches, proportion: {majority_white.mean()}")
         
         # 3. Runs object detection to get bounding boxes
-        bbox_predictions = self._extract_bboxes(slide_patches, majority_white, bbox_predictions)
-        logging.info(f"InferenceModel.predict - Extracted bounding boxes, number: {len(bbox_predictions)}")
+        bbox_predictions = self._extract_bboxes(slide_patches, majority_white)
+        logging.info(f"InferenceModel.predict - Extracted bounding boxes from {len(bbox_predictions)} patches of lowest resolution")
+        logging.info(f"InferenceModel.predict - Bounding boxes:")
+        logging.info(f"InferenceModel.predict - {bbox_predictions}")
         
         # 4. Extracts patches from bounding boxes
         # scale bounding boxes to absolute coordinates of the original image
         scaled_bboxes = self._scale_bboxes(slide, bbox_predictions)
-        logging.info(f"InferenceModel.predict - Scaled bounding boxes, number: {len(scaled_bboxes)}")
+        logging.info(f"InferenceModel.predict - Scaled bounding boxes:")
+        logging.info(f"InferenceModel.predict - {scaled_bboxes}")
 
         # extract patches from bounding boxes
         roi_patches = self._extract_patches_from_rois(slide, scaled_bboxes)
-        logging.info(f"InferenceModel.predict - Extracted roi patches, number: {len(roi_patches)}")
+        logging.info(f"InferenceModel.predict - Extracted roi patches")
 
         # 5. Runs classifier on patches
         patch_predictions = self._classify_patches(roi_patches)
-        logging.info(f"InferenceModel.predict - Classified patches, number: {len(patch_predictions)}")
+        logging.info(f"InferenceModel.predict - Classified patches")
 
         # 6. Aggregate predictions
         prob_list = self._aggregate_patch_pred(patch_predictions)
@@ -138,11 +179,14 @@ class InferenceModel:
     @staticmethod
     def plot_annotations(
         slide_filename: str,
-        slide_preds: List[Dict[str, Union[Tuple[int, int], str]]],
+        slide_preds: Union[
+            List[Dict[str, Union[Tuple[int, int], str]]],
+            List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
+        ],
         roi_patch_size: int,
-        num_classes: int,
         save_plot_path: str,
-        is_prob: bool = False
+        is_prob: bool = False,
+        num_classes: int = 4
     ):
         """
         Plot annotations on slide.
@@ -165,50 +209,141 @@ class InferenceModel:
         scale_factor = np.array(slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
         scaled_patch_size = roi_patch_size * scale_factor
         if not is_prob: # plot annotations
-            fig, ax = plt.subplots(1, 2, figsize=(20, 20))
+            fig, ax = plt.subplots(1, 2, figsize=(15, 8))
             ax[0].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
-            ax[0].set_title("Ground Truth")
-
-            ax[1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
-            ax[1].set_title("Predictions")
+            ax[0].set_title("Predictions")
             pred_mask = np.zeros(slide.level_dimensions[-1], dtype=np.uint8).T
             for slide_pred in slide_preds:
                 coord = np.array(slide_pred["coord"]) * scale_factor
                 pred = slide_pred["pred"]
                 x, y = coord
-                pred_mask[int[y]:int(y+scaled_patch_size), int[x]:int(x+scaled_patch_size)] = pred
-            ax[1].imshow(pred_mask, alpha=0.3, cmap="Reds", vmin=0, vmax=num_classes-1)
+                pred_mask[int(y):int(y+scaled_patch_size[1]), int(x):int(x+scaled_patch_size[0])] = pred
+            ax[0].imshow(pred_mask, alpha=0.5, cmap="Purples", vmin=0, vmax=num_classes-1)
 
-            cmap = plt.cm.get_cmap('Reds', 4)
+            cmap = plt.cm.get_cmap('Purples', 4)
             fig.legend(
                 handles=[
-                    plt.Rectangle((0, 0), 1, 1, color=cmap(i)) for i in range(num_classes)
+                    plt.Rectangle((0, 0), 1, 1, color=cmap(i)) for i in range(1, num_classes)
                 ],
                 labels=[
-                    LABELS2TYPE_MAP[i] for i in range(num_classes)
+                    LABELS2TYPE_MAP[i] for i in range(1, num_classes)
                 ],
                 loc="upper right"
             )
-
         else: # plot n_classes heatmaps
-            fig, ax = plt.subplots(num_classes + 1, 1, figsize=(20, 20))
-            ax[0].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
-            ax[0].set_title("Ground Truth")
-
-            for i in range(1, num_classes + 1):
-                ax[i].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
+            fig, ax = plt.subplots(num_classes, 1, figsize=(12, 35))
+            for i in range(1, num_classes):
+                ax[i-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
                 pred_mask = np.zeros(slide.level_dimensions[-1], dtype=np.uint8).T
                 for slide_pred in slide_preds:
                     coord = np.array(slide_pred["coord"]) * scale_factor
-                    pred = slide_pred["pred"][i-1]
+                    pred = slide_pred["pred"][i]
                     x, y = coord
-                    pred_mask[int[y]:int(y+scaled_patch_size), int[x]:int(x+scaled_patch_size)] = pred
-                ax[i].imshow(pred_mask, alpha=0.3, cmap="gray", vmin=0, vmax=1)
-                ax[i].set_title(f"Class {LABELS2TYPE_MAP[i]}")
-                    
+                    pred_mask[int(y):int(y+scaled_patch_size[1]), int(x):int(x+scaled_patch_size[0])] = pred
+                ax[i-1].imshow(pred_mask, alpha=0.5, cmap="gray", vmin=0, vmax=1)
+                ax[i-1].set_title(f"Class {LABELS2TYPE_MAP[i]}")
                 
+        ax[-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
+        ax[-1].set_title("Ground Truth")
+
+        plt.tight_layout()                
         plt.savefig(save_plot_path)
         plt.close()
+
+    @staticmethod
+    def calculate_metrics(
+        slide_preds: List[Dict[str, Union[Tuple[int, int], str]]],
+        gt_annotations: geojson.FeatureCollection
+    ) -> Dict[str, float]:
+        """
+        Calculate metrics for a slide.
+
+        Parameters
+        ----------
+            slide_preds: List[Dict[str, Union[Tuple[int, int], str]]]
+                A list of annotations for the slide.
+            gt_annotations: List[Dict[str, Union[Tuple[int, int], str]]]
+                A list of ground truth annotations for the slide.
+
+        Returns
+        -------
+            metrics: Dict[str, float]
+                A dictionary containing the metrics.
+        """
+        bboxes_by_class = {}
+        for pred in slide_preds:
+            min_x, min_y = pred["coord"]
+            bbox = Polygon([
+                (min_x, min_y),
+                (min_x + 512, min_y),
+                (min_x + 512, min_y + 512),
+                (min_x, min_y + 512)
+            ])
+            label = pred["pred"]
+            bboxes_by_class.setdefault(label, []).append(bbox)
+
+        grouped_bboxes_by_class = {}
+        for label, bboxes in bboxes_by_class.items():
+            G = nx.Graph()
+            for i, bbox in enumerate(bboxes):
+                G.add_node(i, bbox=bbox)
+
+            for i, bbox in enumerate(bboxes):
+                for j, other_bbox in enumerate(bboxes):
+                    if i == j:
+                        continue
+                    if bbox.intersects(other_bbox.buffer(0.5)):
+                        G.add_edge(i, j)
+
+            grouped_bboxes = []
+            for component in nx.connected_components(G):
+                grouped_bboxes.append(unary_union([bboxes[i] for i in component]))
+
+        grouped_bboxes_by_class[label] = grouped_bboxes
+
+        dice_scores_per_class = {0: [], 1: [], 2: [], 3: []}
+        iou_scores_per_class = {0: [], 1: [], 2: [], 3: []}
+
+        for label, grouped_bboxes in grouped_bboxes_by_class.items():
+            for pred_poly in grouped_bboxes:
+                total_intersection_area = 0
+                total_ground_truth_area = 0
+
+                for feature in gt_annotations.features:
+                    if feature.properties["classification"]["name"] == LABELS2TYPE_MAP[label]:
+                        gt_shape = shape(feature.geometry)
+                        intersection_area = pred_poly.intersection(gt_shape).area
+                        total_intersection_area += intersection_area
+                        total_ground_truth_area += gt_shape.area
+
+                if total_ground_truth_area == 0:
+                    continue
+
+                union_area = pred_poly.area + total_ground_truth_area - total_intersection_area
+                total_area = pred_poly.area + total_ground_truth_area
+
+                dice_score = 2 * total_intersection_area / total_area
+                iou_score = total_intersection_area / union_area
+
+                dice_scores_per_class[label].append(dice_score)
+                iou_scores_per_class[label].append(iou_score)
+
+        for label in dice_scores_per_class:
+            if len(dice_scores_per_class[label]) == 0:
+                dice_scores_per_class[label] = 0
+            else:
+                dice_scores_per_class[label] = np.mean(dice_scores_per_class[label])
+            if len(iou_scores_per_class[label]) == 0:
+                iou_scores_per_class[label] = 0
+            else:
+                iou_scores_per_class[label] = np.mean(iou_scores_per_class[label])
+
+        return {
+            "dice_scores": dice_scores_per_class,
+            "iou_scores": iou_scores_per_class,
+            "macro_dice_score": np.mean(list(dice_scores_per_class.values())),
+            "macro_iou_score": np.mean(list(iou_scores_per_class.values()))
+        }
 
     def _extract_patches_from_slide(self, slide: openslide.OpenSlide) -> np.ndarray:
         """
@@ -268,8 +403,8 @@ class InferenceModel:
         logging.debug(f"InferenceModel._flag_majority_white started")
         flatten_patches = slide_patches.reshape(-1, self.slide_patch_size, 3)
         flatten_bw_patches = cv2.cvtColor(flatten_patches, cv2.COLOR_BGR2GRAY)
-        flatten_bw_patches = flatten_bw_patches.reshape(slide_patches.shape[0]*slide_patches.shape[1], self.slide_patch_size, self.slide_patch_size)
-        majority_white = flatten_bw_patches.mean(axis=0) > self.white_threshold
+        flatten_bw_patches = flatten_bw_patches.reshape(slide_patches.shape[0]*slide_patches.shape[1], self.slide_patch_size*self.slide_patch_size)
+        majority_white = flatten_bw_patches.mean(axis=1) > self.white_threshold
         majority_white = majority_white.reshape(slide_patches.shape[0], slide_patches.shape[1])
 
         # majority_white = np.zeros(slide_patches.shape[:2], dtype=np.bool)
@@ -309,26 +444,29 @@ class InferenceModel:
         bbox_predictions = []
         self.object_detection_model.to(self.device)
         self.object_detection_model.eval()
-        for row in slide_patches.shape[0]:
-            for col in slide_patches.shape[1]:
+        for row in range(slide_patches.shape[0]):
+            for col in range(slide_patches.shape[1]):
                 if majority_white[row][col]:
                     continue
-                patch = slide_patches[row, col, 0]
-                patch = torch.from_numpy(patch).permute(2, 0, 1).unsqueeze(0).to(self.device)
+                patch = self.roi_transform(image=slide_patches[row, col, 0])["image"]
+                patch = patch.float().unsqueeze(0).to(self.device)
                 pred = self.object_detection_model(patch)
-                pred_boxes = pred["boxes"].cpu().numpy()
-                pred_scores = pred["scores"].cpu().numpy()
+                pred_boxes = pred[0]["boxes"].cpu().detach().numpy()
+                pred_scores = pred[0]["scores"].cpu().detach().numpy()
 
-                keep = torchvision.ops.nms(
+                nms_filtered_indices = torchvision.ops.nms(
                     torch.from_numpy(pred_boxes),
                     torch.from_numpy(pred_scores),
                     self.box_nms_threshold
                 )
 
                 # filter out boxes with low scores
-                keep = keep[pred_scores[keep] > self.box_score_threshold]
+                score_filtered_indices = pred_scores > self.box_score_threshold
+
                 # filter out boxes with small areas
-                keep = keep[(pred_boxes[keep, 2] - pred_boxes[keep, 0]) * (pred_boxes[keep, 3] - pred_boxes[keep, 1]) > self.box_area_threshold]
+                area_filtered_indices = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (pred_boxes[:, 3] - pred_boxes[:, 1]) > self.box_area_threshold
+                
+                keep = np.intersect1d(nms_filtered_indices, np.intersect1d(score_filtered_indices, area_filtered_indices))
 
                 bbox_predictions.append({
                     "row": row,
@@ -337,6 +475,9 @@ class InferenceModel:
                 })
 
         logging.debug(f"InferenceModel._extract_bboxes ended")
+        self.object_detection_model.cpu()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return bbox_predictions
     
@@ -368,11 +509,10 @@ class InferenceModel:
         scale_factor = np.array(slide.level_dimensions[0]) / np.array(slide.level_dimensions[-1])
         for bbox_prediction in bbox_predictions:
             boxes = bbox_prediction["pred_boxes"]
+            row = bbox_prediction["row"]
+            col = bbox_prediction["col"]
             # scale boxes to original image size using absolute coordinates
-            offset = np.array([
-                bbox_prediction["row"],
-                bbox_prediction["col"]
-            ]) * self.slide_patch_size
+            offset = np.array([col, row, col, row]) * self.slide_patch_size
             boxes = boxes + offset
             boxes = boxes.reshape(-1, 2, 2) * scale_factor[::-1]
             boxes = boxes.reshape(-1, 4)
@@ -466,12 +606,16 @@ class InferenceModel:
         self.classifier_model.eval()
         for roi_patch in roi_patches:
             patches = roi_patch["patches"]
-            patches = patches.reshape(-1, 3, self.roi_patch_size, self.roi_patch_size)
-            patches = torch.from_numpy(patches).to(self.device)
-            patches = patches.float() / 255.0
-            pred = self.classifier_model(patches)
+            patches = patches.reshape(-1, self.roi_patch_size, self.roi_patch_size, 3)
+            
+            # TODO: break into smaller batches
+            tensor_patches = torch.zeros(patches.shape[0], 3, 256, 256)
+            for i in range(patches.shape[0]):
+                tensor_patches[i] = self.patch_transform(image=patches[i])["image"]
+            tensor_patches = tensor_patches.float().to(self.device)
+            pred = self.classifier_model(tensor_patches)
             pred = pred.softmax(dim=1)
-            pred = pred.cpu().numpy().reshape(roi_patches.shape[0], roi_patches.shape[1], -1)
+            pred = pred.cpu().detach().numpy().reshape(roi_patch["patches"].shape[0], roi_patch["patches"].shape[1], self.num_classes)
             patch_predictions.append({
                 "pred": pred,
                 "min_coord": roi_patch["min_coord"],
@@ -479,6 +623,9 @@ class InferenceModel:
             })
 
         logging.debug(f"InferenceModel._classify_patches ended")
+        self.classifier_model.cpu()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return patch_predictions
     
@@ -515,9 +662,9 @@ class InferenceModel:
                     pixel_prediction = pred[y, x]
                     pixel_coord = (min_coord[0] + x*self.roi_patch_size, min_coord[1] + y*self.roi_patch_size)
                     if pixel_coord not in pixel_predictions:
-                        pixel_predictions[pixel_coord] = [pixel_prediction[y, x], 1]
+                        pixel_predictions[pixel_coord] = [pixel_prediction, 1]
                     else:
-                        pixel_predictions[pixel_coord][0] += pixel_prediction[y, x]
+                        pixel_predictions[pixel_coord][0] += pixel_prediction
                         pixel_predictions[pixel_coord][1] += 1
         
         aggregate_predictions = []
