@@ -302,10 +302,10 @@ if __name__ == "__main__":
     # patchify and save training sample patches 1
     for idx, (roi, mask) in enumerate(zip(rois, masks)):
         # sample 40x and 20x patches
-        patchify_and_save(np.array(roi["image"]), mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-40x", overlap=False)
+        patchify_and_save(np.array(roi["image"]), mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-40x")
 
         roi_arr, mask = resize_roi_and_masks(np.array(roi["image"]), mask, downsample_factor=2)
-        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-20x", overlap=False)
+        patchify_and_save(roi_arr, mask, save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-20x")
 
     logging.info("main - saved BRACS_1486 patches")
 
