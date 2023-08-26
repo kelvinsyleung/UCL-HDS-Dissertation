@@ -386,7 +386,7 @@ def plot_history(history: Dict[str, List[float]], save_path: str, model_type: st
         model_type: str
             The type of model. e.g. "classification", "detection", or "segmentation".
     """
-    Path(save_path).mkdir(parents=True, exist_ok=True)
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
     if model_type != "detection":
         plt.figure(figsize=(12, 4))
         plt.subplot(1, 2, 1)
