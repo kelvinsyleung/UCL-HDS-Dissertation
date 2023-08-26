@@ -17,13 +17,14 @@ import cv2
 from coord_utils import get_bbox_by_shape, get_relative_coordinates, pad_roi_coordinates
 from log_utils import setup_logging
 
-OPENSLIDE_PATH  = r"C:/openslide/openslide-win64/bin"
+OPENSLIDE_PATH = r"C:/openslide/openslide-win64/bin"
 if hasattr(os, "add_dll_directory"):
     # Python >= 3.8 on Windows
     with os.add_dll_directory(OPENSLIDE_PATH):
         import openslide
 else:
     import openslide
+
 
 def create_bbox_list(annotations: Dict) -> List[Dict[str, Union[str, Tuple[np.ndarray, np.ndarray]]]]:
     """
@@ -42,11 +43,12 @@ def create_bbox_list(annotations: Dict) -> List[Dict[str, Union[str, Tuple[np.nd
         })
     return bboxes
 
+
 def get_annotated_rois(
-        slide: openslide.OpenSlide,
-        bboxes: List[Dict[str, Union[str, Tuple[np.ndarray, np.ndarray]]]],
-        patch_size: int, step_size: int
-    ) -> List[Dict[str, Union[str, np.ndarray]]]:
+    slide: openslide.OpenSlide,
+    bboxes: List[Dict[str, Union[str, Tuple[np.ndarray, np.ndarray]]]],
+    patch_size: int, step_size: int
+) -> List[Dict[str, Union[str, np.ndarray]]]:
     """
     Given a list of bounding boxes, return a list of ROI images and their classifications
     ROI images are padded by double the patch_size and step_size at max resolution
@@ -58,7 +60,8 @@ def get_annotated_rois(
     for bbox in bboxes:
         min_coord, max_coord = bbox["coordinates"][0], bbox["coordinates"][1]
         # pad the coordinates by double the patch_size and step_size
-        min_coord, max_coord = pad_roi_coordinates(min_coord, max_coord, slide.dimensions, patch_size*2, step_size*2)
+        min_coord, max_coord = pad_roi_coordinates(
+            min_coord, max_coord, slide.dimensions, patch_size*2, step_size*2)
 
         roi = slide.read_region(
             min_coord,
@@ -72,6 +75,7 @@ def get_annotated_rois(
             "image": roi
         })
     return rois
+
 
 def display_rois(rois: List[Dict[str, Union[str, Tuple[int, int], Image.Image]]], output_path: str):
     """
@@ -92,10 +96,11 @@ def display_rois(rois: List[Dict[str, Union[str, Tuple[int, int], Image.Image]]]
     plt.close()
     logging.info(f"display_rois - saved to {output_path}")
 
+
 def create_masks(
-        rois: List[Dict[str, Union[str, Tuple[int, int], Image.Image]]],
-        annotations: Dict
-    ) -> List[np.ndarray]:
+    rois: List[Dict[str, Union[str, Tuple[int, int], Image.Image]]],
+    annotations: Dict
+) -> List[np.ndarray]:
     """
     Given a dictionary of annotations, return a list of masks of each ROI
 
@@ -111,10 +116,15 @@ def create_masks(
 
         # create blank mask if type is not polygon
         if annotation["geometry"]["type"] == "Polygon":
-        # first list of coordinate is the outer polygon, the rest are holes
+            # first list of coordinate is the outer polygon, the rest are holes
             coordinates_arr = np.array(coordinates[0]).squeeze()
-            relative_coordinates = get_relative_coordinates(coordinates_arr, min_coord)
-            mask = cv2.fillPoly(mask, pts=np.array([relative_coordinates], dtype=np.int32), color=(255, 255, 255))
+            relative_coordinates = get_relative_coordinates(
+                coordinates_arr, min_coord)
+            mask = cv2.fillPoly(
+                mask,
+                pts=np.array([relative_coordinates], dtype=np.int32),
+                color=(255, 255, 255)
+            )
         elif annotation["geometry"]["type"] == "MultiPolygon":
             # loop through each polygon, stop at the first polygon with more than 4 coordinates
             for polygon in coordinates:
@@ -122,12 +132,18 @@ def create_masks(
                 coordinates_arr = np.array(polygon[0]).squeeze()
                 # take only polygon with more than 4 coordinates
                 if coordinates_arr.shape[0] > 4:
-                    relative_coordinates = get_relative_coordinates(coordinates_arr, min_coord)
-                    mask = cv2.fillPoly(mask, pts=np.array([relative_coordinates], dtype=np.int32), color=(255, 255, 255))
+                    relative_coordinates = get_relative_coordinates(
+                        coordinates_arr, min_coord)
+                    mask = cv2.fillPoly(
+                        mask,
+                        pts=np.array([relative_coordinates], dtype=np.int32),
+                        color=(255, 255, 255)
+                    )
                     break
-        
+
         masks.append(mask)
     return masks
+
 
 def display_patch(patch: np.ndarray, mask_patch: Union[np.ndarray, None] = None, is_overlay: bool = False):
     plt.imshow(patch, vmin=0, vmax=255)
@@ -136,20 +152,26 @@ def display_patch(patch: np.ndarray, mask_patch: Union[np.ndarray, None] = None,
         plt.imshow(masked_arr, alpha=0.5)
     plt.axis("off")
 
+
 def display_patches(
-        patches: np.ndarray, output_path: str, mask_patches: Union[np.ndarray, List] = [],
-        is_mask: bool = False, is_overlay: bool = False
-    ):
+    patches: np.ndarray, output_path: str, mask_patches: Union[np.ndarray, List] = [],
+    is_mask: bool = False, is_overlay: bool = False
+):
     """
     Given a list of ROIs, display them
     """
     num_of_patches = patches.shape[0] * patches.shape[1]
-    logging.info(f"display_patches - total number of patches: {num_of_patches}")
+    logging.info(
+        f"display_patches - total number of patches: {num_of_patches}")
     plt.figure(figsize=(15, 10))
     for i in range(patches.shape[0]):
         for j in range(patches.shape[1]):
             patch = patches[i, j, 0]
-            plt.subplot(patches.shape[0], patches.shape[1], i*patches.shape[1] + j + 1)
+            plt.subplot(
+                patches.shape[0],
+                patches.shape[1],
+                i*patches.shape[1] + j + 1
+            )
             if is_mask:
                 patch = np.ma.masked_where(patches[i, j] == 0, patches[i, j])
             # set vmin and vmax to 0 and 255 to display the mask
@@ -164,6 +186,7 @@ def display_patches(
     plt.close()
     logging.info(f"display_patches - saved to {output_path}")
 
+
 def resize_roi_and_masks(roi_arr: np.ndarray, mask: np.ndarray, downsample_factor: int = 2):
     """
     Given a ROI and its mask, resize them by the downsample factor
@@ -172,10 +195,13 @@ def resize_roi_and_masks(roi_arr: np.ndarray, mask: np.ndarray, downsample_facto
     mask = mask.astype(np.uint8)
 
     # downsample the roi_arr and mask, W and H are reversed for cv2.resize
-    roi_arr = cv2.resize(roi_arr, (roi_arr.shape[1]//downsample_factor, roi_arr.shape[0]//downsample_factor))
-    mask = cv2.resize(mask, (mask.shape[1]//downsample_factor, mask.shape[0]//downsample_factor))
+    roi_arr = cv2.resize(
+        roi_arr, (roi_arr.shape[1]//downsample_factor, roi_arr.shape[0]//downsample_factor))
+    mask = cv2.resize(
+        mask, (mask.shape[1]//downsample_factor, mask.shape[0]//downsample_factor))
 
     return roi_arr, mask
+
 
 def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str = ".", verbose: bool = False):
     """
@@ -194,26 +220,34 @@ def save_patches(patches: np.ndarray, mask_patches: np.ndarray, save_path: str =
             # save mask
             mask = mask_patches[i, j]
             mask = cv2.resize(mask.astype(np.uint8), (256, 256))
-            mask = Image.fromarray(np.stack((mask,)*3, axis=-1).astype(np.uint8))
-            
+            mask = Image.fromarray(
+                np.stack((mask,)*3, axis=-1).astype(np.uint8)
+            )
+
             os.makedirs(f"{save_path}/mask", exist_ok=True)
             mask.save(f"{save_path}/mask/{i}_{j}.png")
 
     if verbose:
         logging.info(f"save_patches - saved {num_of_patches} patches")
 
+
 def patchify_and_save(
-        roi_arr: np.ndarray, mask: np.ndarray,
-        patch_size: int, step_size: int,
-        save_path: str = ".", verbose: bool = False
-    ):
+    roi_arr: np.ndarray, mask: np.ndarray,
+    patch_size: int, step_size: int,
+    save_path: str = ".", verbose: bool = False
+):
     """
     Patchify a ROI and its mask and save them to a given path
     """
     assert roi_arr.shape[0] == mask.shape[0] and roi_arr.shape[1] == mask.shape[1], "ROI and mask must have the same shape"
-    roi_patches = patchify(roi_arr, (patch_size, patch_size, 3), step=step_size)
+    roi_patches = patchify(
+        roi_arr, (patch_size, patch_size, 3), step=step_size)
     mask_patches = patchify(mask, (patch_size, patch_size), step=step_size)
-    save_patches(roi_patches, mask_patches, save_path=save_path, verbose=verbose)
+    save_patches(
+        roi_patches, mask_patches,
+        save_path=save_path, verbose=verbose
+    )
+
 
 def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str, set_type: str, patch_size: int, step_size: int):
     """
@@ -224,14 +258,16 @@ def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str,
     # create if not exists
     if not f"{patch_folder}/{set_type}/{file_id}" in glob.glob(f"{patch_folder}/{set_type}/{file_id}"):
         logging.info(f"create_patches_dataset - processing: {file_id}")
-        wsi_file_paths = glob.glob(f"{data_folder}/{set_type}/**/{file_id}.svs", recursive=True)
+        wsi_file_paths = glob.glob(
+            f"{data_folder}/{set_type}/**/{file_id}.svs", recursive=True)
 
         if len(wsi_file_paths) != 0:
             try:
                 slide = openslide.OpenSlide(wsi_file_paths[0])
                 annotations = geojson.load(open(annot_path))
                 bbox_list = create_bbox_list(annotations)
-                rois = get_annotated_rois(slide, bbox_list, patch_size, step_size)
+                rois = get_annotated_rois(
+                    slide, bbox_list, patch_size, step_size)
                 masks = create_masks(rois, annotations)
 
                 for idx, (roi, mask) in enumerate(zip(rois, masks)):
@@ -241,31 +277,42 @@ def create_patches_dataset(annot_path: str, patch_folder: str, data_folder: str,
                         save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-40x",
                     )
 
-                    roi_arr, mask = resize_roi_and_masks(roi["image"], mask, downsample_factor=2)
+                    roi_arr, mask = resize_roi_and_masks(
+                        roi["image"], mask, downsample_factor=2)
                     patchify_and_save(
                         roi_arr, mask, patch_size, step_size,
                         save_path=f"{patch_folder}/{set_type}/{file_id}/{roi['class']}-{idx}-20x",
                     )
 
             except Exception as e:
-                logging.exception(f"create_patches_dataset - fail to process {file_id}:")
+                logging.exception(
+                    f"create_patches_dataset - fail to process {file_id}:")
                 raise e
             finally:
                 slide.close()
-            
+
         gc.collect()
     else:
-        logging.info(f"create_patches_dataset - {patch_folder}/{set_type}/{file_id} already exists")
+        logging.info(
+            f"create_patches_dataset - {patch_folder}/{set_type}/{file_id} already exists")
+
 
 if __name__ == "__main__":
     setup_logging()
 
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("-p", "--project_root", help="project root path to export the extracted patch data, e.g. -p /path/to/project/", type=str, default=".", required=True)
-    argParser.add_argument("-r", "--raw_data_folder", help="raw data folder path, e.g. -r /path/to/raw", type=str, required=True)
-    argParser.add_argument("-a", "--annot_folder", help="annotation folder path, e.g. -a /path/to/annot", type=str, required=True)
-    argParser.add_argument("-t", "--tile_size", help="tile size, e.g. -t 512", type=int, default=512)
-    argParser.add_argument("-s", "--step_size", help="step size, e.g. -s 512", type=int, default=512)
+    argParser.add_argument(
+        "-p", "--project_root",
+        help="project root path to export the extracted patch data, e.g. -p /path/to/project/", type=str, default=".", required=True)
+    argParser.add_argument(
+        "-r", "--raw_data_folder",
+        help="raw data folder path, e.g. -r /path/to/raw", type=str, required=True)
+    argParser.add_argument(
+        "-a", "--annot_folder", help="annotation folder path, e.g. -a /path/to/annot", type=str, required=True)
+    argParser.add_argument(
+        "-t", "--tile_size", help="tile size, e.g. -t 512", type=int, default=512)
+    argParser.add_argument(
+        "-s", "--step_size", help="step size, e.g. -s 512", type=int, default=512)
     args = argParser.parse_args()
 
     # absolute path for loading patches
@@ -282,7 +329,8 @@ if __name__ == "__main__":
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
 
     # get slide sample 1
-    slide = openslide.OpenSlide(f"{RAW_DATA_FOLDER_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
+    slide = openslide.OpenSlide(
+        f"{RAW_DATA_FOLDER_PATH}/train/Group_AT/Type_ADH/BRACS_1486.svs")
 
     logging.info(f"main - levels: {slide.level_count}")
     logging.info(f"main - level dimensions {slide.level_dimensions}")
@@ -296,7 +344,9 @@ if __name__ == "__main__":
     masks = create_masks(rois, annotations)
 
     # display lowest resolution 1
-    slide.get_thumbnail(slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/BRACS_1486.png")
+    slide.get_thumbnail(
+        slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/BRACS_1486.png"
+                                         )
     logging.info(f"main - saved to {OUTPUT_PLOT_PATH}/BRACS_1486.png")
 
     # display ROIs
@@ -310,7 +360,10 @@ if __name__ == "__main__":
             save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-40x"
         )
 
-        roi_arr, mask = resize_roi_and_masks(np.array(roi["image"]), mask, downsample_factor=2)
+        roi_arr, mask = resize_roi_and_masks(
+            np.array(roi["image"]), mask,
+            downsample_factor=2
+        )
         patchify_and_save(
             roi_arr, mask, PATCH_SIZE, STEP_SIZE,
             save_path=f"{PATCH_PATH}/sample/BRACS_1486/{roi['class']}-{idx}-20x"
@@ -337,10 +390,17 @@ if __name__ == "__main__":
         mask_patches = np.array(mask_patches)
 
         # reshape patches and mask_patches to (vertical position, horizontal position, H, W, C)
-        vertical_patch_idx, horizontal_patch_idx = patch_paths[-1].split("/")[-1].split(".")[0].split("_")
-        vertical_patch_count, horizontal_patch_count = int(vertical_patch_idx) + 1, int(horizontal_patch_idx) + 1
-        patches = patches.reshape((vertical_patch_count, horizontal_patch_count, patches.shape[1], patches.shape[2], patches.shape[3]))
-        mask_patches = mask_patches.reshape((vertical_patch_count, horizontal_patch_count, mask_patches.shape[1], mask_patches.shape[2]))
+        v_idx, h_idx = patch_paths[-1].split("/")[-1].split(".")[0].split("_")
+        v_count = int(v_idx) + 1
+        h_count = int(h_idx) + 1
+        patches = patches.reshape((
+            v_count, h_count,
+            patches.shape[1], patches.shape[2], patches.shape[3]
+        ))
+        mask_patches = mask_patches.reshape((
+            v_count, h_count,
+            mask_patches.shape[1], mask_patches.shape[2]
+        ))
 
         display_patches(
             patches,
@@ -351,7 +411,8 @@ if __name__ == "__main__":
         )
 
     # get slide sample 2
-    slide = openslide.OpenSlide(f"{RAW_DATA_FOLDER_PATH}/train/Group_BT/Type_PB/BRACS_745.svs")
+    slide = openslide.OpenSlide(
+        f"{RAW_DATA_FOLDER_PATH}/train/Group_BT/Type_PB/BRACS_745.svs")
 
     logging.info(f"main - levels: {slide.level_count}")
     logging.info(f"main - level dimensions {slide.level_dimensions}")
@@ -365,33 +426,48 @@ if __name__ == "__main__":
     masks = create_masks(rois, annotations)
 
     # display lowest resolution 2
-    slide.get_thumbnail(slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/BRACS_745.png")
+    slide.get_thumbnail(
+        slide.level_dimensions[-1]).save(f"{OUTPUT_PLOT_PATH}/BRACS_745.png")
     logging.info("main - saved BRACS_745.png")
 
     display_rois(rois, output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_rois.png")
 
     # patchify sample patches 2
     roi_image_arr = np.array(rois[0]["image"])
-    sample_patches = patchify(roi_image_arr, (PATCH_SIZE, PATCH_SIZE, 3), step=STEP_SIZE)
-    sample_mask_patches = patchify(masks[0], (PATCH_SIZE, PATCH_SIZE), step=STEP_SIZE)
+    sample_patches = patchify(
+        roi_image_arr, (PATCH_SIZE, PATCH_SIZE, 3), step=STEP_SIZE)
+    sample_mask_patches = patchify(
+        masks[0], (PATCH_SIZE, PATCH_SIZE), step=STEP_SIZE)
 
     # plot sample patches 2
-    display_patches(sample_patches, output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_patches.png")
-    display_patches(sample_mask_patches, output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_mask_patches.png", is_mask=True)
-    display_patches(sample_patches, output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_overlay_patches.png", mask_patches=sample_mask_patches, is_overlay=True)
+    display_patches(
+        sample_patches,
+        output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_patches.png"
+    )
+    display_patches(
+        sample_mask_patches,
+        output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_mask_patches.png", is_mask=True
+    )
+    display_patches(
+        sample_patches,
+        output_path=f"{OUTPUT_PLOT_PATH}/BRACS_745_sample_overlay_patches.png",
+        mask_patches=sample_mask_patches, is_overlay=True
+    )
 
     gc.collect()
 
     # get all annotations
     train_set = glob.glob(f"{ANNOT_PATH}/train/**/*.geojson", recursive=True)
     val_set = glob.glob(f"{ANNOT_PATH}/val/**/*.geojson", recursive=True)
-    
-    failed_file_path = Path(f"{OUTPUT_PATH}/failed_preprocess_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
 
-    logging.info("main - start processing train set")   
+    failed_file_path = Path(
+        f"{OUTPUT_PATH}/failed_preprocess_files-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
+
+    logging.info("main - start processing train set")
     for train_annot_path in train_set:
         try:
-            create_patches_dataset(train_annot_path, PATCH_PATH, RAW_DATA_FOLDER_PATH, "train", PATCH_SIZE, STEP_SIZE)
+            create_patches_dataset(
+                train_annot_path, PATCH_PATH, RAW_DATA_FOLDER_PATH, "train", PATCH_SIZE, STEP_SIZE)
         except Exception as e:
             file_id = train_annot_path.split('/')[-1].split('.')[0]
             with open(failed_file_path, 'a+') as f:
@@ -400,7 +476,8 @@ if __name__ == "__main__":
     logging.info("main - start processing validation set")
     for val_annot_path in val_set:
         try:
-            create_patches_dataset(val_annot_path, PATCH_PATH, RAW_DATA_FOLDER_PATH, "val", PATCH_SIZE, STEP_SIZE)
+            create_patches_dataset(
+                val_annot_path, PATCH_PATH, RAW_DATA_FOLDER_PATH, "val", PATCH_SIZE, STEP_SIZE)
         except Exception as e:
             file_id = val_annot_path.split('/')[-1].split('.')[0]
             with open(failed_file_path, 'a+') as f:

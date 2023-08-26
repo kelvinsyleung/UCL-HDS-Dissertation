@@ -34,9 +34,12 @@ if __name__ == "__main__":
     setup_logging()
 
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
-    argParser.add_argument("-c", "--color_space", help="color space: RGB, CIELAB, or BW e.g. -c RGB", type=str, default="RGB")
-    argParser.add_argument("-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
+    argParser.add_argument(
+        "-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
+    argParser.add_argument(
+        "-c", "--color_space", help="color space: RGB, CIELAB, or BW e.g. -c RGB", type=str, default="RGB")
+    argParser.add_argument(
+        "-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
     args = argParser.parse_args()
 
     # absolute path for loading patches
@@ -58,7 +61,8 @@ if __name__ == "__main__":
     MAGNIFICATION = args.mag
     logging.info(f"main - MAGNIFICATION: {MAGNIFICATION}")
     # load dataset
-    train_patches_paths = sorted(glob.glob(f"{PATCH_PATH}/train/**/*-{MAGNIFICATION}"))
+    train_patches_paths = sorted(
+        glob.glob(f"{PATCH_PATH}/train/**/*-{MAGNIFICATION}"))
 
     train_img_path = []
     train_mask_path = []
@@ -70,11 +74,14 @@ if __name__ == "__main__":
     train_img_path.sort()
     train_mask_path.sort()
 
-    assert len(train_img_path) == len(train_mask_path), "Number of images and masks should be equal"
+    assert len(train_img_path) == len(
+        train_mask_path), "Number of images and masks should be equal"
 
-    logging.info(f"main - Number of {MAGNIFICATION} train images: {len(train_img_path)}")
+    logging.info(
+        f"main - Number of {MAGNIFICATION} train images: {len(train_img_path)}")
 
-    val_patches_paths = sorted(glob.glob(f"{PATCH_PATH}/val/**/*-{MAGNIFICATION}"))
+    val_patches_paths = sorted(
+        glob.glob(f"{PATCH_PATH}/val/**/*-{MAGNIFICATION}"))
 
     val_img_path = []
     val_mask_path = []
@@ -86,9 +93,11 @@ if __name__ == "__main__":
     val_img_path.sort()
     val_mask_path.sort()
 
-    assert len(val_img_path) == len(val_mask_path), "Number of images and masks should be equal"
+    assert len(val_img_path) == len(
+        val_mask_path), "Number of images and masks should be equal"
 
-    logging.info(f"main - Number of {MAGNIFICATION} val images: {len(val_img_path)}")
+    logging.info(
+        f"main - Number of {MAGNIFICATION} val images: {len(val_img_path)}")
 
     # albumentations transforms
     train_transform = A.Compose([
@@ -111,7 +120,6 @@ if __name__ == "__main__":
     NUM_WORKERS = 8
     PREFETCH_FACTOR = 4
 
-
     input_channels = 3
     # color space
     COLOR_SPACE = args.color_space
@@ -125,7 +133,8 @@ if __name__ == "__main__":
     norm_img_path = val_img_path[len(val_img_path)//2]
     norm_img_arr = cv2.cvtColor(cv2.imread(norm_img_path), cv2.COLOR_BGR2RGB)
 
-    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(backend='numpy')
+    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(
+        backend='numpy')
     stain_normaliser.fit(norm_img_arr)
 
     # datasets
@@ -150,7 +159,7 @@ if __name__ == "__main__":
         transform=val_transform,
         seed=0
     )
-    
+
     # dataloaders
     worker_g = torch.Generator()
     worker_g.manual_seed(0)
@@ -164,7 +173,7 @@ if __name__ == "__main__":
         patch_val_dataset, batch_size=BATCHSIZE, shuffle=False,
         num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
     )
-    
+
     # define the loss function and the optimizer
     criterion = smp.losses.DiceLoss(mode="multiclass", from_logits=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -174,7 +183,8 @@ if __name__ == "__main__":
     set_name = f"unet_{COLOR_SPACE}_{MAGNIFICATION}"
 
     def eval_fn(output, targets, num_classes):
-        tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(output, dim=1).long(), targets, mode="multiclass", num_classes=num_classes)
+        tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(
+            output, dim=1).long(), targets, mode="multiclass", num_classes=num_classes)
         return smp.metrics.f1_score(tp, fp, fn, tn, reduction="macro")
 
     # train the network
@@ -197,7 +207,9 @@ if __name__ == "__main__":
 
     # display the total time needed to perform the training
     end_time = time.time()
-    logging.info(f"main - Total time taken to train the {set_name} model: {(end_time - start_time):.2f}s")
+    logging.info(
+        f"main - Total time taken to train the {set_name} model: {(end_time - start_time):.2f}s")
 
     # plot the loss and accuracy history
-    plot_history(history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")
+    plot_history(
+        history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")

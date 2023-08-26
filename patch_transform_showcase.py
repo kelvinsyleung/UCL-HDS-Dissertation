@@ -25,19 +25,26 @@ torch.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
 
+
 def cielab_intensify_to_rgb(img: Union[np.ndarray, torch.Tensor], rate: float):
     cie_img = np.array(img)
     if isinstance(img, torch.Tensor):
         cie_img = cie_img * 255
-    cie_img[:, :, 0][cie_img[:, :, 0] > 127] = np.clip(cie_img[:, :, 0][cie_img[:, :, 0] > 127] * (1 + rate), 0, 255)
-    cie_img[:, :, 0][cie_img[:, :, 0] < 127] = np.clip(cie_img[:, :, 0][cie_img[:, :, 0] < 127] * (1 - rate), 0, 255)
+    cie_img[:, :, 0][cie_img[:, :, 0] > 127] = np.clip(
+        cie_img[:, :, 0][cie_img[:, :, 0] > 127] * (1 + rate), 0, 255)
+    cie_img[:, :, 0][cie_img[:, :, 0] < 127] = np.clip(
+        cie_img[:, :, 0][cie_img[:, :, 0] < 127] * (1 - rate), 0, 255)
 
-    cie_img[:, :, 1][cie_img[:, :, 1] > 127] = np.clip(cie_img[:, :, 1][cie_img[:, :, 1] > 127] * (1 - rate), 0, 255)
-    cie_img[:, :, 1][cie_img[:, :, 1] < 127] = np.clip(cie_img[:, :, 1][cie_img[:, :, 1] < 127] * (1 + rate), 0, 255)
+    cie_img[:, :, 1][cie_img[:, :, 1] > 127] = np.clip(
+        cie_img[:, :, 1][cie_img[:, :, 1] > 127] * (1 - rate), 0, 255)
+    cie_img[:, :, 1][cie_img[:, :, 1] < 127] = np.clip(
+        cie_img[:, :, 1][cie_img[:, :, 1] < 127] * (1 + rate), 0, 255)
 
-    cie_img[:, :, 2][cie_img[:, :, 2] > 127] = np.clip(cie_img[:, :, 2][cie_img[:, :, 2] > 127] * (1 - rate), 0, 255)
-    cie_img[:, :, 2][cie_img[:, :, 2] < 127] = np.clip(cie_img[:, :, 2][cie_img[:, :, 2] < 127] * (1 + rate), 0, 255)
-    
+    cie_img[:, :, 2][cie_img[:, :, 2] > 127] = np.clip(
+        cie_img[:, :, 2][cie_img[:, :, 2] > 127] * (1 - rate), 0, 255)
+    cie_img[:, :, 2][cie_img[:, :, 2] < 127] = np.clip(
+        cie_img[:, :, 2][cie_img[:, :, 2] < 127] * (1 + rate), 0, 255)
+
     cie_img = cie_img.astype(np.uint8)
     rgb_img = cv2.cvtColor(cie_img, cv2.COLOR_LAB2RGB)
     return rgb_img
@@ -47,7 +54,8 @@ if __name__ == "__main__":
     setup_logging()
 
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
+    argParser.add_argument(
+        "-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
     args = argParser.parse_args()
 
     # absolute path for loading patches
@@ -77,7 +85,8 @@ if __name__ == "__main__":
         plt.savefig(f"{OUTPUT_PLOT_PATH}/read_patch_example.png")
         plt.close()
         break
-    logging.info(f"main - saved read patch example to {OUTPUT_PLOT_PATH}/read_patch_example.png")
+    logging.info(
+        f"main - saved read patch example to {OUTPUT_PLOT_PATH}/read_patch_example.png")
 
     test_img = cv2.imread(test_img_path, cv2.IMREAD_UNCHANGED)
     test_img = cv2.cvtColor(test_img, cv2.COLOR_BGRA2RGB)
@@ -85,22 +94,24 @@ if __name__ == "__main__":
     bw_test_img = cv2.cvtColor(test_img, cv2.COLOR_RGB2GRAY)
     fig, ax = plt.subplots(1, 3, figsize=(15, 15))
 
-
     logging.info(f"main - RGB image shape: {test_img.shape}")
     logging.info(f"main - RGB example pixel values: {test_img[200, 100, :]}")
 
     logging.info(f"main - CIELAB image shape: {cielab_test_img.shape}")
-    logging.info(f"main - CIELAB example pixel values:{cielab_test_img[200, 100, :]}")
+    logging.info(
+        f"main - CIELAB example pixel values:{cielab_test_img[200, 100, :]}")
 
     logging.info(f"main - Black and white image shape: {bw_test_img.shape}")
-    logging.info(f"main - Black and white example pixel values: {bw_test_img[200, 100]}")
+    logging.info(
+        f"main - Black and white example pixel values: {bw_test_img[200, 100]}")
 
     ax[0].imshow(test_img)
     ax[1].imshow(cielab_test_img)
     ax[2].imshow(bw_test_img, cmap="gray")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/colorspace_example.png")
     plt.close()
-    logging.info(f"main - saved colorspace example plot to {OUTPUT_PLOT_PATH}/colorspace_example.png")
+    logging.info(
+        f"main - saved colorspace example plot to {OUTPUT_PLOT_PATH}/colorspace_example.png")
 
     fig, ax = plt.subplots(1, 2, figsize=(15, 15))
 
@@ -109,7 +120,8 @@ if __name__ == "__main__":
     ax[1].imshow(cielab_intensify_to_rgb(cielab_test_img, 0.1))
     ax[1].set_title("Intensified image")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/cielab_intensify_example.png")
-    logging.info(f"main - saved cielab intensify example plot to {OUTPUT_PLOT_PATH}/cielab_intensify_example.png")
+    logging.info(
+        f"main - saved cielab intensify example plot to {OUTPUT_PLOT_PATH}/cielab_intensify_example.png")
 
     # albumentations transforms
     train_transform = A.Compose([
@@ -128,7 +140,8 @@ if __name__ == "__main__":
     # load dataset
     train_20x_patches_paths = sorted(glob.glob(PATCH_PATH + "/train/**/*-20x"))
 
-    set(map(lambda x: "-".join(os.path.split(x)[-1].split("-")[:-2]), train_20x_patches_paths))
+    set(map(lambda x: "-".join(os.path.split(x)
+        [-1].split("-")[:-2]), train_20x_patches_paths))
 
     train_20x_img_path = []
     train_20x_mask_path = []
@@ -140,9 +153,11 @@ if __name__ == "__main__":
     train_20x_img_path.sort()
     train_20x_mask_path.sort()
 
-    assert len(train_20x_img_path) == len(train_20x_mask_path), "Number of images and masks should be equal"
+    assert len(train_20x_img_path) == len(
+        train_20x_mask_path), "Number of images and masks should be equal"
 
-    logging.info(f"main - Number of 20x train images: {len(train_20x_img_path)}")
+    logging.info(
+        f"main - Number of 20x train images: {len(train_20x_img_path)}")
 
     with open(f'{DATA_PATH}/train_20x_img_paths.txt', 'w+') as f:
         f.write('\n'.join(train_20x_img_path))
@@ -162,7 +177,8 @@ if __name__ == "__main__":
     val_20x_img_path.sort()
     val_20x_mask_path.sort()
 
-    assert len(val_20x_img_path) == len(val_20x_mask_path), "Number of images and masks should be equal"
+    assert len(val_20x_img_path) == len(
+        val_20x_mask_path), "Number of images and masks should be equal"
 
     logging.info(f"main - Number of 20x val images: {len(val_20x_img_path)}")
 
@@ -175,7 +191,8 @@ if __name__ == "__main__":
     norm_img_path = val_20x_img_path[len(val_20x_img_path)//2]
     norm_img_arr = cv2.cvtColor(cv2.imread(norm_img_path), cv2.COLOR_BGR2RGB)
 
-    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(backend='numpy')
+    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(
+        backend='numpy')
     stain_normaliser.fit(norm_img_arr)
 
     # test 20x datasets creation
@@ -229,11 +246,15 @@ if __name__ == "__main__":
     ax[2].imshow(bw_mask > 0, alpha=0.3, cmap="gray")
 
     plt.savefig(f"{OUTPUT_PLOT_PATH}/data_augmentation_example.png")
-    logging.info(f"main - Data augmentation example saved to {OUTPUT_PLOT_PATH}/data_augmentation_example.png")
+    logging.info(
+        f"main - Data augmentation example saved to {OUTPUT_PLOT_PATH}/data_augmentation_example.png")
 
-    rgb_20x_loader = DataLoader(patch_rgb_20x_8cls_dataset, batch_size=8, shuffle=True)
-    cielab_20x_loader = DataLoader(patch_cielab_20x_8cls_dataset, batch_size=8, shuffle=True)
-    bw_20x_loader = DataLoader(patch_bw_20x_8cls_dataset, batch_size=8, shuffle=True)
+    rgb_20x_loader = DataLoader(
+        patch_rgb_20x_8cls_dataset, batch_size=8, shuffle=True)
+    cielab_20x_loader = DataLoader(
+        patch_cielab_20x_8cls_dataset, batch_size=8, shuffle=True)
+    bw_20x_loader = DataLoader(
+        patch_bw_20x_8cls_dataset, batch_size=8, shuffle=True)
 
     torch.manual_seed(0)
     np.random.seed(0)
@@ -244,4 +265,3 @@ if __name__ == "__main__":
     plt.imshow(img[0].permute(1, 2, 0))
     plt.imshow(mask[0] > 0, alpha=0.3, cmap="gray")
     plt.savefig(f"{OUTPUT_PLOT_PATH}/rgb_dataloader_example.png")
-

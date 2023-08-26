@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 
+
 class Conv_block(nn.Module):
     """
     A convolutional block consisting of two convolutional layers with batch normalization and ReLU activation.
-    
+
     Parameters
     ----------
         in_channels: int
@@ -18,15 +19,18 @@ class Conv_block(nn.Module):
         padding: str
             The padding to use.
     """
+
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding="same"):
         super(Conv_block, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)
+        self.conv = nn.Conv2d(in_channels, out_channels,
+                              kernel_size, stride, padding, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size, stride, padding, bias=False)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,
+                               kernel_size, stride, padding, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.relu2 = nn.ReLU(inplace=True)
-        
+
     def forward(self, x):
         x = self.conv(x)
         x = self.bn1(x)
@@ -35,6 +39,7 @@ class Conv_block(nn.Module):
         x = self.bn2(x)
         x = self.relu2(x)
         return x
+
 
 class Downsample_block(nn.Module):
     """
@@ -53,9 +58,11 @@ class Downsample_block(nn.Module):
         padding: str
             The padding to use.
     """
+
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding="same"):
         super(Downsample_block, self).__init__()
-        self.conv_block = Conv_block(in_channels, out_channels, kernel_size, stride, padding)
+        self.conv_block = Conv_block(
+            in_channels, out_channels, kernel_size, stride, padding)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.dropout = nn.Dropout2d(p=0.3)
 
@@ -64,6 +71,7 @@ class Downsample_block(nn.Module):
         x = self.pool(skip)
         x = self.dropout(x)
         return x, skip
+
 
 class Upsample_block(nn.Module):
     """
@@ -82,11 +90,14 @@ class Upsample_block(nn.Module):
         padding: str
             The padding to use.
     """
+
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding="same"):
         super(Upsample_block, self).__init__()
-        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        self.up = nn.ConvTranspose2d(
+            in_channels, out_channels, kernel_size=2, stride=2)
         self.dropout = nn.Dropout2d(p=0.3)
-        self.conv_block = Conv_block(in_channels, out_channels, kernel_size, stride, padding)
+        self.conv_block = Conv_block(
+            in_channels, out_channels, kernel_size, stride, padding)
 
     def forward(self, x, skip):
         x = self.up(x)
@@ -94,6 +105,7 @@ class Upsample_block(nn.Module):
         x = self.dropout(x)
         x = self.conv_block(x)
         return x
+
 
 class UNet(nn.Module):
     """
@@ -108,6 +120,7 @@ class UNet(nn.Module):
         features: list
             A list of the number of features in each layer.
     """
+
     def __init__(self, in_channels=3, out_channels=3, features=[64, 128, 256, 512]):
         super(UNet, self).__init__()
         # Downsample 64 -> 128 -> 256 -> 512
@@ -116,13 +129,15 @@ class UNet(nn.Module):
         self.down3 = Downsample_block(features[1], features[2])
         self.down4 = Downsample_block(features[2], features[3])
         # Bottleneck 512 -> 1024
-        self.bottleneck = Conv_block(features[3], features[3]*2, kernel_size=3, stride=1, padding="same")
+        self.bottleneck = Conv_block(
+            features[3], features[3]*2, kernel_size=3, stride=1, padding="same")
         # Upsample 512 -> 256 -> 128 -> 64
         self.up1 = Upsample_block(features[3]*2, features[3])
         self.up2 = Upsample_block(features[3], features[2])
         self.up3 = Upsample_block(features[2], features[1])
         self.up4 = Upsample_block(features[1], features[0])
-        self.out = nn.Conv2d(features[0], out_channels, kernel_size=1, stride=1, padding=0, bias=True)
+        self.out = nn.Conv2d(
+            features[0], out_channels, kernel_size=1, stride=1, padding=0, bias=True)
 
     def forward(self, x):
         # Downsample 64 -> 128 -> 256 -> 512

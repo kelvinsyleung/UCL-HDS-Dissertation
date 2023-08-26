@@ -1,8 +1,9 @@
 NAME2SUBTYPELABELS_MAP = {
-    "BENIGN": 1, # unable to cross reference with the roi dataset from BRACS
+    "BENIGN": 1,  # unable to cross reference with the roi dataset from BRACS
     "Benign sure": 1,
     "Benign-sure": 1,
-    "Pathological-benign (Benign-sure)": 1, # unable to cross reference with the roi dataset from BRACS
+    # unable to cross reference with the roi dataset from BRACS
+    "Pathological-benign (Benign-sure)": 1,
     "Pathologica benign": 2,
     "Pathological-benign": 2,
     "UDH": 3,
@@ -29,10 +30,11 @@ LABELS2SUBTYPE_MAP = {
 }
 
 NAME2TYPELABELS_MAP = {
-    "BENIGN": 1, # unable to cross reference with the roi dataset from BRACS
+    "BENIGN": 1,  # unable to cross reference with the roi dataset from BRACS
     "Benign sure": 1,
     "Benign-sure": 1,
-    "Pathological-benign (Benign-sure)": 1, # unable to cross reference with the roi dataset from BRACS
+    # unable to cross reference with the roi dataset from BRACS
+    "Pathological-benign (Benign-sure)": 1,
     "Pathologica benign": 1,
     "Pathological-benign": 1,
     "UDH": 1,

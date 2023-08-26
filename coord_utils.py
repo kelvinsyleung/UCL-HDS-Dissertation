@@ -2,6 +2,7 @@ from typing import Tuple, List
 
 import numpy as np
 
+
 def get_relative_coordinates(coordinates: np.ndarray, min_coord: Tuple) -> np.ndarray:
     """
     Given a list of coordinates, return the relative coordinates
@@ -19,6 +20,7 @@ def get_relative_coordinates(coordinates: np.ndarray, min_coord: Tuple) -> np.nd
     """
     return np.subtract(coordinates, min_coord)
 
+
 def get_absolute_coordinates(coordinates: np.ndarray, min_coord: Tuple) -> np.ndarray:
     """
     Given a list of coordinates, return the absolute coordinates
@@ -35,6 +37,7 @@ def get_absolute_coordinates(coordinates: np.ndarray, min_coord: Tuple) -> np.nd
         list of absolute coordinates
     """
     return np.add(coordinates, min_coord)
+
 
 def get_bbox_by_shape(coordinates: List, shape_type: str) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -65,10 +68,11 @@ def get_bbox_by_shape(coordinates: List, shape_type: str) -> Tuple[np.ndarray, n
                 break
     else:
         raise ValueError(f"Unknown shape type: {shape_type}")
-    
+
     min_coord = np.floor(np.min(coordinates_arr, axis=0)).astype(int)
     max_coord = np.ceil(np.max(coordinates_arr, axis=0)).astype(int)
     return tuple(min_coord), tuple(max_coord)
+
 
 def pad_roi_coordinates(
     min_coord: Tuple[int, int],
@@ -118,7 +122,7 @@ def pad_roi_coordinates(
             min(new_max_coord[0] + width_pad//2, max_boundaries[0]),
             min(new_max_coord[1] + height_pad//2, max_boundaries[1])
         )
-    
+
     # check if the patch is still smaller than patch size
     # if yes, add padding to the other side of the patch
     if (new_max_coord[0] - new_min_coord[0]) < patch_size or (new_max_coord[1] - new_min_coord[1]) < patch_size:
@@ -150,7 +154,8 @@ def pad_roi_coordinates(
 
     # if the roi does not mod step size, add padding to the sides of the patch
     if (new_max_coord[0] - new_min_coord[0]) % step_size != 0:
-        width_pad = step_size - ((new_max_coord[0] - new_min_coord[0]) % step_size)
+        width_pad = step_size - \
+            ((new_max_coord[0] - new_min_coord[0]) % step_size)
         new_min_coord = (
             max(new_min_coord[0] - width_pad//2, 0),
             new_min_coord[1]
@@ -161,7 +166,8 @@ def pad_roi_coordinates(
         )
 
     if (new_max_coord[1] - new_min_coord[1]) % step_size != 0:
-        height_pad = step_size - ((new_max_coord[1] - new_min_coord[1]) % step_size)
+        height_pad = step_size - \
+            ((new_max_coord[1] - new_min_coord[1]) % step_size)
         new_min_coord = (
             new_min_coord[0],
             max(new_min_coord[1] - height_pad//2, 0)
@@ -175,13 +181,15 @@ def pad_roi_coordinates(
     # if yes, add padding to the other side of the patch
     if (new_max_coord[0] - new_min_coord[0]) % step_size != 0:
         if new_max_coord[0] == max_boundaries[0]:
-            width_pad = step_size - ((new_max_coord[0] - new_min_coord[0]) % step_size)
+            width_pad = step_size - \
+                ((new_max_coord[0] - new_min_coord[0]) % step_size)
             new_min_coord = (
                 max(new_min_coord[0] - width_pad, 0),
                 new_min_coord[1]
             )
         else:
-            width_pad = step_size - ((new_max_coord[0] - new_min_coord[0]) % step_size)
+            width_pad = step_size - \
+                ((new_max_coord[0] - new_min_coord[0]) % step_size)
             new_max_coord = (
                 min(new_max_coord[0] + width_pad, max_boundaries[0]),
                 new_max_coord[1]
@@ -189,18 +197,19 @@ def pad_roi_coordinates(
 
     if (new_max_coord[1] - new_min_coord[1]) % step_size != 0:
         if new_max_coord[1] == max_boundaries[1]:
-            height_pad = step_size - ((new_max_coord[1] - new_min_coord[1]) % step_size)
+            height_pad = step_size - \
+                ((new_max_coord[1] - new_min_coord[1]) % step_size)
             new_min_coord = (
                 new_min_coord[0],
                 max(new_min_coord[1] - height_pad, 0)
             )
         else:
-            height_pad = step_size - ((new_max_coord[1] - new_min_coord[1]) % step_size)
+            height_pad = step_size - \
+                ((new_max_coord[1] - new_min_coord[1]) % step_size)
             new_max_coord = (
                 new_max_coord[0],
                 min(new_max_coord[1] + height_pad, max_boundaries[1])
             )
-
 
     if for_inference:
         # x-axis
@@ -270,7 +279,7 @@ def pad_roi_coordinates(
                 )
             else:
                 raise ValueError("Cannot shift roi to fit patch size")
-            
+
         #  check against original min and max y-coordinates
         if new_min_coord[1] > min_coord[1]:
             height_pad = patch_size - (new_min_coord[1] % patch_size)

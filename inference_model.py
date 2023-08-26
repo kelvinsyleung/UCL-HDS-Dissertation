@@ -23,13 +23,14 @@ from log_utils import setup_logging
 from class_mapping import LABELS2TYPE_MAP, LABELS2SUBTYPE_MAP
 from patch_dataset import PatchDataset
 
-OPENSLIDE_PATH  = r'C:/openslide/openslide-win64/bin'
+OPENSLIDE_PATH = r'C:/openslide/openslide-win64/bin'
 if hasattr(os, 'add_dll_directory'):
     # Python >= 3.8 on Windows
     with os.add_dll_directory(OPENSLIDE_PATH):
         import openslide
 else:
     import openslide
+
 
 class InferenceModel:
     def __init__(
@@ -86,7 +87,7 @@ class InferenceModel:
         ])
 
         setup_logging()
-    
+
     def predict_proba(
         self,
         slide_filename: str
@@ -98,7 +99,7 @@ class InferenceModel:
         ----------
             slide_filename: str
                 The filename of the slide to run inference on.
-        
+
         Returns
         -------
             prob_list: List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
@@ -117,18 +118,24 @@ class InferenceModel:
 
         # 1. Extract patches from slide
         slide_patches = self._extract_patches_from_slide(slide)
-        logging.info(f"InferenceModel.predict - Extracted slide patches, shape: {slide_patches.shape}")
+        logging.info(
+            f"InferenceModel.predict - Extracted slide patches, shape: {slide_patches.shape}"
+        )
 
         # 2. Flag slides that are majority white
         majority_white = self._flag_majority_white(slide_patches)
-        logging.info(f"InferenceModel.predict - Flagged majority white patches, proportion: {majority_white.mean()}")
-        
+        logging.info(
+            f"InferenceModel.predict - Flagged majority white patches, proportion: {majority_white.mean()}"
+        )
+
         # 3. Runs object detection to get bounding boxes
         bbox_predictions = self._extract_bboxes(slide_patches, majority_white)
-        logging.info(f"InferenceModel.predict - Extracted bounding boxes from {len(bbox_predictions)} patches of lowest resolution")
+        logging.info(
+            f"InferenceModel.predict - Extracted bounding boxes from {len(bbox_predictions)} patches of lowest resolution"
+        )
         logging.info(f"InferenceModel.predict - Bounding boxes:")
         logging.info(f"InferenceModel.predict - {bbox_predictions}")
-        
+
         # 4. Extracts patches from bounding boxes
         # scale bounding boxes to absolute coordinates of the original image
         scaled_bboxes = self._scale_bboxes(slide, bbox_predictions)
@@ -145,8 +152,10 @@ class InferenceModel:
 
         # 6. Aggregate predictions
         prob_list = self._aggregate_patch_pred(patch_predictions)
-        logging.info(f"InferenceModel.predict - Aggregated predictions, number: {len(prob_list)}")
-        
+        logging.info(
+            f"InferenceModel.predict - Aggregated predictions, number: {len(prob_list)}"
+        )
+
         return prob_list
 
     def predict(
@@ -175,7 +184,7 @@ class InferenceModel:
             })
 
         return slide_preds
-    
+
     @staticmethod
     def plot_annotations(
         slide_filename: str,
@@ -205,10 +214,12 @@ class InferenceModel:
                 Whether the annotations are probabilities or not.
         """
         slide = openslide.OpenSlide(slide_filename)
-        
-        scale_factor = np.array(slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
+
+        scale_factor = np.array(
+            slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0]
+                                                   )
         scaled_patch_size = roi_patch_size * scale_factor
-        if not is_prob: # plot annotations
+        if not is_prob:  # plot annotations
             fig, ax = plt.subplots(1, 2, figsize=(15, 8))
             ax[0].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
             ax[0].set_title("Predictions")
@@ -217,8 +228,14 @@ class InferenceModel:
                 coord = np.array(slide_pred["coord"]) * scale_factor
                 pred = slide_pred["pred"]
                 x, y = coord
-                pred_mask[int(y):int(y+scaled_patch_size[1]), int(x):int(x+scaled_patch_size[0])] = pred
-            ax[0].imshow(pred_mask, alpha=0.5, cmap="Purples", vmin=0, vmax=num_classes-1)
+                pred_mask[
+                    int(y):int(y+scaled_patch_size[1]),
+                    int(x):int(x+scaled_patch_size[0])
+                ] = pred
+            ax[0].imshow(
+                pred_mask, alpha=0.5, cmap="Purples",
+                vmin=0, vmax=num_classes-1
+            )
 
             cmap = plt.cm.get_cmap('Purples', 4)
             fig.legend(
@@ -230,23 +247,29 @@ class InferenceModel:
                 ],
                 loc="upper right"
             )
-        else: # plot n_classes heatmaps
+        else:  # plot n_classes heatmaps
             fig, ax = plt.subplots(num_classes, 1, figsize=(12, 35))
             for i in range(1, num_classes):
                 ax[i-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
-                pred_mask = np.zeros(slide.level_dimensions[-1], dtype=np.uint8).T
+                pred_mask = np.zeros(
+                    slide.level_dimensions[-1], dtype=np.uint8).T
                 for slide_pred in slide_preds:
                     coord = np.array(slide_pred["coord"]) * scale_factor
                     pred = slide_pred["pred"][i]
                     x, y = coord
-                    pred_mask[int(y):int(y+scaled_patch_size[1]), int(x):int(x+scaled_patch_size[0])] = pred
-                ax[i-1].imshow(pred_mask, alpha=0.5, cmap="gray", vmin=0, vmax=1)
+                    pred_mask[
+                        int(y):int(y+scaled_patch_size[1]),
+                        int(x):int(x+scaled_patch_size[0])] = pred
+                ax[i-1].imshow(
+                    pred_mask, alpha=0.5,
+                    cmap="gray", vmin=0, vmax=1
+                )
                 ax[i-1].set_title(f"Class {LABELS2TYPE_MAP[i]}")
-                
+
         ax[-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
         ax[-1].set_title("Ground Truth")
 
-        plt.tight_layout()                
+        plt.tight_layout()
         plt.savefig(save_plot_path)
         plt.close()
 
@@ -297,7 +320,9 @@ class InferenceModel:
 
             grouped_bboxes = []
             for component in nx.connected_components(G):
-                grouped_bboxes.append(unary_union([bboxes[i] for i in component]))
+                grouped_bboxes.append(
+                    unary_union([bboxes[i] for i in component])
+                )
 
         grouped_bboxes_by_class[label] = grouped_bboxes
 
@@ -312,7 +337,8 @@ class InferenceModel:
                 for feature in gt_annotations.features:
                     if feature.properties["classification"]["name"] == LABELS2TYPE_MAP[label]:
                         gt_shape = shape(feature.geometry)
-                        intersection_area = pred_poly.intersection(gt_shape).area
+                        intersection_area = pred_poly.intersection(
+                            gt_shape).area
                         total_intersection_area += intersection_area
                         total_ground_truth_area += gt_shape.area
 
@@ -332,11 +358,13 @@ class InferenceModel:
             if len(dice_scores_per_class[label]) == 0:
                 dice_scores_per_class[label] = 0
             else:
-                dice_scores_per_class[label] = np.mean(dice_scores_per_class[label])
+                dice_scores_per_class[label] = np.mean(
+                    dice_scores_per_class[label])
             if len(iou_scores_per_class[label]) == 0:
                 iou_scores_per_class[label] = 0
             else:
-                iou_scores_per_class[label] = np.mean(iou_scores_per_class[label])
+                iou_scores_per_class[label] = np.mean(
+                    iou_scores_per_class[label])
 
         return {
             "dice_scores": dice_scores_per_class,
@@ -348,7 +376,7 @@ class InferenceModel:
     def _extract_patches_from_slide(self, slide: openslide.OpenSlide) -> np.ndarray:
         """
         Extract patches from a slide using the lowest resolution slide thumbnail.
-        
+
         Parameters
         ----------
             slide: openslide.OpenSlide
@@ -369,8 +397,10 @@ class InferenceModel:
         slide_thumbnail = np.pad(
             slide_thumbnail,
             (
-                (0, self.slide_patch_size - slide_thumbnail.shape[0] % self.slide_patch_size),
-                (0, self.slide_patch_size - slide_thumbnail.shape[1] % self.slide_patch_size),
+                (0, self.slide_patch_size -
+                 slide_thumbnail.shape[0] % self.slide_patch_size),
+                (0, self.slide_patch_size -
+                 slide_thumbnail.shape[1] % self.slide_patch_size),
                 (0, 0)
             ),
             constant_values=255
@@ -385,16 +415,16 @@ class InferenceModel:
         logging.debug(f"InferenceModel._extract_patches_from_slide ended")
 
         return slide_patches
-    
+
     def _flag_majority_white(self, slide_patches: np.ndarray) -> np.ndarray:
         """
         Flag patches extracted from the lowest resolution thumbnail image that are majority white.
-        
+
         Parameters
         ----------
             slide_patches: np.ndarray
                 The patches to flag.
-        
+
         Returns
         -------
             majority_white: np.ndarray
@@ -403,9 +433,15 @@ class InferenceModel:
         logging.debug(f"InferenceModel._flag_majority_white started")
         flatten_patches = slide_patches.reshape(-1, self.slide_patch_size, 3)
         flatten_bw_patches = cv2.cvtColor(flatten_patches, cv2.COLOR_BGR2GRAY)
-        flatten_bw_patches = flatten_bw_patches.reshape(slide_patches.shape[0]*slide_patches.shape[1], self.slide_patch_size*self.slide_patch_size)
+        flatten_bw_patches = flatten_bw_patches.reshape(
+            slide_patches.shape[0]*slide_patches.shape[1],
+            self.slide_patch_size*self.slide_patch_size
+        )
         majority_white = flatten_bw_patches.mean(axis=1) > self.white_threshold
-        majority_white = majority_white.reshape(slide_patches.shape[0], slide_patches.shape[1])
+        majority_white = majority_white.reshape(
+            slide_patches.shape[0],
+            slide_patches.shape[1]
+        )
 
         # majority_white = np.zeros(slide_patches.shape[:2], dtype=np.bool)
         # for row in range(slide_patches.shape[0]):
@@ -417,7 +453,7 @@ class InferenceModel:
         logging.debug(f"InferenceModel._flag_majority_white ended")
 
         return majority_white
-    
+
     def _extract_bboxes(
         self,
         slide_patches: np.ndarray,
@@ -427,7 +463,7 @@ class InferenceModel:
         Extract bounding boxes from patches.
 
         Runs object detection on patches that are not majority white.
-        
+
         Parameters
         ----------
             slide_patches: np.ndarray
@@ -448,7 +484,8 @@ class InferenceModel:
             for col in range(slide_patches.shape[1]):
                 if majority_white[row][col]:
                     continue
-                patch = self.roi_transform(image=slide_patches[row, col, 0])["image"]
+                patch = self.roi_transform(
+                    image=slide_patches[row, col, 0])["image"]
                 patch = patch.float().unsqueeze(0).to(self.device)
                 pred = self.object_detection_model(patch)
                 pred_boxes = pred[0]["boxes"].cpu().detach().numpy()
@@ -464,9 +501,11 @@ class InferenceModel:
                 score_filtered_indices = pred_scores > self.box_score_threshold
 
                 # filter out boxes with small areas
-                area_filtered_indices = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (pred_boxes[:, 3] - pred_boxes[:, 1]) > self.box_area_threshold
-                
-                keep = np.intersect1d(nms_filtered_indices, np.intersect1d(score_filtered_indices, area_filtered_indices))
+                area_filtered_indices = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (
+                    pred_boxes[:, 3] - pred_boxes[:, 1]) > self.box_area_threshold
+
+                keep = np.intersect1d(nms_filtered_indices, np.intersect1d(
+                    score_filtered_indices, area_filtered_indices))
 
                 bbox_predictions.append({
                     "row": row,
@@ -480,7 +519,7 @@ class InferenceModel:
             torch.cuda.empty_cache()
 
         return bbox_predictions
-    
+
     def _scale_bboxes(
         self,
         slide: openslide.OpenSlide,
@@ -490,14 +529,14 @@ class InferenceModel:
         Scale bounding boxes to original image size.
 
         Multiply the coordinates of the bounding boxes by the scaling factor between the lowest resolution and highest resolution.
-        
+
         Parameters
         ----------
             slide: openslide.OpenSlide
                 The slide to scale the bounding boxes to.
             bbox_predictions: List[Dict[str, Union[int, np.ndarray]]]
                 A list of dictionaries containing the row and column of the patch and the predicted bounding boxes.
-                
+
         Returns
         -------
             scaled_bboxes: List[np.ndarray]
@@ -506,7 +545,10 @@ class InferenceModel:
         logging.debug(f"InferenceModel._scale_bboxes started")
         scaled_bboxes = []
         # scaling factor between lowest resolution and highest resolution in [width, height]
-        scale_factor = np.array(slide.level_dimensions[0]) / np.array(slide.level_dimensions[-1])
+        scale_factor = np.array(
+            slide.level_dimensions[0]
+        ) / np.array(slide.level_dimensions[-1])
+
         for bbox_prediction in bbox_predictions:
             boxes = bbox_prediction["pred_boxes"]
             row = bbox_prediction["row"]
@@ -521,7 +563,7 @@ class InferenceModel:
         logging.debug(f"InferenceModel._scale_bboxes ended")
 
         return scaled_bboxes
-    
+
     def _extract_patches_from_rois(
         self,
         slide: openslide.OpenSlide,
@@ -606,16 +648,23 @@ class InferenceModel:
         self.classifier_model.eval()
         for roi_patch in roi_patches:
             patches = roi_patch["patches"]
-            patches = patches.reshape(-1, self.roi_patch_size, self.roi_patch_size, 3)
-            
+            patches = patches.reshape(
+                -1, self.roi_patch_size, self.roi_patch_size, 3
+            )
+
             # TODO: break into smaller batches
             tensor_patches = torch.zeros(patches.shape[0], 3, 256, 256)
             for i in range(patches.shape[0]):
-                tensor_patches[i] = self.patch_transform(image=patches[i])["image"]
+                tensor_patches[i] = self.patch_transform(
+                    image=patches[i])["image"]
             tensor_patches = tensor_patches.float().to(self.device)
             pred = self.classifier_model(tensor_patches)
             pred = pred.softmax(dim=1)
-            pred = pred.cpu().detach().numpy().reshape(roi_patch["patches"].shape[0], roi_patch["patches"].shape[1], self.num_classes)
+            pred = pred.cpu().detach().numpy().reshape(
+                roi_patch["patches"].shape[0],
+                roi_patch["patches"].shape[1],
+                self.num_classes
+            )
             patch_predictions.append({
                 "pred": pred,
                 "min_coord": roi_patch["min_coord"],
@@ -628,23 +677,23 @@ class InferenceModel:
             torch.cuda.empty_cache()
 
         return patch_predictions
-    
+
     def _aggregate_patch_pred(
         self,
         patch_predictions: List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
     ) -> List[Dict[str, Union[Tuple[int, int], np.ndarray]]]:
         """
         Aggregate patch predictions by averaging predictions for each retrieved patch bounded by the predicted bounding boxes.
-        
+
         Create the slide annotations in every roi_patch_size x roi_patch_size pixels patch.
 
         Slide annotations should have min x and y coordinates of multples of roi_patch_size
-        
+
         Parameters
         ----------
             patch_predictions: List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
                 A list of dictionaries containing the probabilities of each class and the coordinates of the padded bounding boxes.
-                
+
         Returns
         -------
             slide_annotations: List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
@@ -654,19 +703,22 @@ class InferenceModel:
         pixel_predictions = {}
         for patch_prediction in patch_predictions:
             pred = patch_prediction["pred"]
-            min_coord = patch_prediction["min_coord"] # (x_min, y_min)
+            min_coord = patch_prediction["min_coord"]  # (x_min, y_min)
 
             # compile list of bbox coordinates for each class
             for y in range(pred.shape[0]):
                 for x in range(pred.shape[1]):
                     pixel_prediction = pred[y, x]
-                    pixel_coord = (min_coord[0] + x*self.roi_patch_size, min_coord[1] + y*self.roi_patch_size)
+                    pixel_coord = (
+                        min_coord[0] + x*self.roi_patch_size,
+                        min_coord[1] + y*self.roi_patch_size
+                    )
                     if pixel_coord not in pixel_predictions:
                         pixel_predictions[pixel_coord] = [pixel_prediction, 1]
                     else:
                         pixel_predictions[pixel_coord][0] += pixel_prediction
                         pixel_predictions[pixel_coord][1] += 1
-        
+
         aggregate_predictions = []
         # average predictions for each pixel
         for coords, (pred_prob, count) in pixel_predictions.items():
