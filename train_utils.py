@@ -338,8 +338,8 @@ def run_train_loop(
         if epoch > best_model_epoch + patience:
             logging.info(
                 f"train_utils - Early stopping at epoch {epoch+1}, best model at epoch {best_model_epoch+1}"
-                )
-            if model_type != "detection":
+            )
+            if model_type == "detection":
                 logging.info(
                     f"train_utils - Best model validation loss: {best_model_val_loss:.4f}"
                 )
@@ -373,19 +373,25 @@ def seed_worker(worker_id):
     torch.cuda.manual_seed_all(worker_seed)
 
 
-def plot_history(history, save_path: str):
+def plot_history(history: Dict[str, List[float]], save_path: str, model_type: str):
     """
     Plot the training history.
 
     Parameters
     ----------
-        history: Dict
+        history: Dict[str, List[float]]
             The training history.
         save_path: str
             The path to save the plot.
+        model_type: str
+            The type of model. e.g. "classification", "detection", or "segmentation".
     """
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
+    Path(save_path).mkdir(parents=True, exist_ok=True)
+    if model_type != "detection":
+        plt.figure(figsize=(12, 4))
+        plt.subplot(1, 2, 1)
+    else:
+        plt.figure(figsize=(6, 4))
     plt.plot(
         range(1, len(history["train_loss"]) + 1),
         history["train_loss"], label="train loss"
@@ -399,17 +405,20 @@ def plot_history(history, save_path: str):
     plt.ylabel("Loss")
     plt.legend()
 
-    plt.subplot(1, 2, 2)
-    plt.plot(
-        range(1, len(history["train_score"]) + 1),
-        history["train_score"], label="train score"
-    )
-    plt.plot(
-        range(1, len(history["val_score"]) + 1),
-        history["val_score"], label="validation score"
-    )
-    plt.title("score vs epochs")
-    plt.xlabel("Epochs")
-    plt.ylabel("score")
-    plt.legend()
+    if model_type != "detection":
+        plt.subplot(1, 2, 2)
+        plt.plot(
+            range(1, len(history["train_score"]) + 1),
+            history["train_score"], label="train score"
+        )
+        plt.plot(
+            range(1, len(history["val_score"]) + 1),
+            history["val_score"], label="validation score"
+        )
+        plt.title("score vs epochs")
+        plt.xlabel("Epochs")
+        plt.ylabel("score")
+        plt.legend()
+
+    plt.tight_layout()
     plt.savefig(save_path)
