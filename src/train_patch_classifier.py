@@ -134,21 +134,42 @@ if __name__ == "__main__":
     ])
 
     # stain normalisation
-    train_norm_img_path = train_img_path[len(train_img_path)//2]
+    train_norm_img_selected = False
+    img_idx = len(train_img_path)//2
+    while not train_norm_img_selected:
+        train_norm_img_path = train_img_path[img_idx]
+        bw_img = cv2.cvtColor(cv2.imread(
+            train_norm_img_path), cv2.COLOR_BGR2GRAY)
+        train_norm_img_selected = bw_img.mean() <= 200
+        img_idx = (img_idx + 1) % len(train_img_path)
+
     train_norm_img_arr = cv2.cvtColor(
         cv2.imread(train_norm_img_path), cv2.COLOR_BGR2RGB)
     plt.imshow(train_norm_img_arr)
-    plt.title("Image selected for normalisation in training set")
-    plt.savefig(f"{OUTPUT_PLOT_PATH}/train_norm_img.png")
+    plt.title(
+        f"Image selected for normalisation in {MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'} training set")
+    plt.savefig(
+        f"{OUTPUT_PLOT_PATH}/train_norm_img_{MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'}.png")
     plt.close()
     logging.info(f"main - train_norm_img_path: {train_norm_img_path}")
 
-    val_norm_img_path = val_img_path[len(val_img_path)//2]
+    val_norm_img_selected = False
+    img_idx = len(val_img_path)//2
+    while not val_norm_img_selected:
+        val_norm_img_path = val_img_path[img_idx]
+        bw_img = cv2.cvtColor(cv2.imread(
+            val_norm_img_path), cv2.COLOR_BGR2GRAY)
+        val_norm_img_selected = bw_img.mean() <= 200
+        print(val_norm_img_path, val_norm_img_selected)
+        img_idx = (img_idx + 1) % len(train_img_path)
+
     val_norm_img_arr = cv2.cvtColor(
         cv2.imread(val_norm_img_path), cv2.COLOR_BGR2RGB)
     plt.imshow(val_norm_img_arr)
-    plt.title("Image selected for normalisation in validation set")
-    plt.savefig(f"{OUTPUT_PLOT_PATH}/val_norm_img.png")
+    plt.title(
+        f"Image selected for normalisation in {MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'} validation set")
+    plt.savefig(
+        f"{OUTPUT_PLOT_PATH}/val_norm_img{MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'}.png")
     plt.close()
     logging.info(f"main - val_norm_img_path: {val_norm_img_path}")
 
