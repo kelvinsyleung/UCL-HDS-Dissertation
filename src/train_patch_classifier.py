@@ -71,6 +71,7 @@ if __name__ == "__main__":
     # relative to script execution path
     OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots/train_patch_classifier"
     MODEL_SAVEPATH = f"{PROJECT_ROOT}/models/train_patch_classifier"
+    PRETRAINED_MODEL_PATH = f"{PROJECT_ROOT}/models/pretrained"
 
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
     Path(MODEL_SAVEPATH).mkdir(parents=True, exist_ok=True)
@@ -173,8 +174,9 @@ if __name__ == "__main__":
 
     # model
     if TRANSFER_LEARNING:
-        model = torchvision.models.resnext50_32x4d(
-            weights=torchvision.models.resnet.ResNeXt50_32X4D_Weights.DEFAULT)
+        model = torchvision.models.resnext50_32x4d()
+        model.load_state_dict(torch.load(
+            f"{PRETRAINED_MODEL_PATH}/resnext50_32x4d-1a0047aa.pth"))
         num_ftrs = model.fc.in_features
         model.fc = torch.nn.Linear(num_ftrs, num_classes)
     else:
