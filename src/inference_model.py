@@ -20,7 +20,7 @@ from albumentations.pytorch import ToTensorV2
 
 from coord_utils import get_absolute_coordinates, pad_roi_coordinates
 from log_utils import setup_logging
-from class_mapping import LABELS2TYPE_MAP, LABELS2SUBTYPE_MAP
+from class_mapping import LABELS2TYPE_MAP
 from patch_dataset import PatchDataset
 
 OPENSLIDE_PATH = r'C:/openslide/openslide-win64/bin'
@@ -40,6 +40,7 @@ class InferenceModel:
         box_nms_threshold: float = 1.0,
         box_score_threshold: float = 0.04,
         box_area_threshold: float = 50,
+        class_prop_threshold: float = 0.01,
         num_classes: int = 4
     ):
         """
@@ -63,18 +64,23 @@ class InferenceModel:
                 The threshold to use to filter out boxes with low scores.
             box_area_threshold: float
                 The threshold to use to filter out boxes with small areas.
+            class_prop_threshold: float
+                The threshold of the proportion of predicted rois of a class to flag the whole slide as that class.
+
+                Higher severity class precedes lower, even if the proportion of the lower severity class is greater.
             num_classes: int
                 The number of classes. Currently only supports 4 classes. 0 represents background.
         """
-        self.object_detection_model = object_detection_model
         self.classifier_model = classifier_model
+        self.object_detection_model = object_detection_model
+        self.device = device
         self.slide_patch_size = slide_patch_size
         self.roi_patch_size = roi_patch_size
         self.white_threshold = white_threshold
         self.box_nms_threshold = box_nms_threshold
         self.box_score_threshold = box_score_threshold
         self.box_area_threshold = box_area_threshold
-        self.device = device
+        self.class_prop_threshold = class_prop_threshold
         self.num_classes = num_classes
 
         self.roi_transform = A.Compose([
@@ -160,8 +166,8 @@ class InferenceModel:
 
     def predict(
         self,
-        slide_filename: str,
-    ) -> List[Dict[str, Union[Tuple[int, int], str]]]:
+        slide_filename: str
+    ) -> Dict[str, Union[List[Dict[str, Union[Tuple[int, int], int]]], int]]:
         """
         Inference on a slide.
 
@@ -172,23 +178,47 @@ class InferenceModel:
 
         Returns
         -------
-            slide_annotations: List[Dict]
-                A list of annotations for the slide.
+            slide_pred: Dict[str, Union[List[Dict[str, Union[Tuple[int, int], int]]], int]]
+                A dictionary containing the predictions for the slide.
+                key: "roi_preds", value: A list of dictionaries containing the coordinates of the patch and the predicted class.
+                key: "slide_class", value: The predicted class for the whole slide.
         """
+        # get patch level probabilities
         prob_list = self.predict_proba(slide_filename)
-        slide_preds = []
+
+        # get patch level predictions by taking the argmax of the probabilities
+        roi_preds = []
         for prob in prob_list:
-            slide_preds.append({
+            roi_preds.append({
                 "coord": prob["coord"],
                 "pred": np.argmax(prob["pred"])
             })
 
-        return slide_preds
+        # compute whole slide level prediction
+        patch_class_counts = np.zeros(self.num_classes)
+        for roi_pred in roi_preds:
+            patch_class_counts[roi_pred["pred"]] += 1
+
+        slide_class = 0
+        # iterate from highest severity class to lowest
+        for i in range(1, self.num_classes)[::-1]:
+            # if the proportion of predicted rois of a class is greater than the threshold,
+            # flag the whole slide as that class
+            if patch_class_counts[i] / len(roi_preds) > self.class_prop_threshold:
+                slide_class = i
+                break
+
+        slide_pred = {
+            "roi_preds": roi_preds,
+            "slide_class": slide_class
+        }
+
+        return slide_pred
 
     @staticmethod
     def plot_annotations(
         slide_filename: str,
-        slide_preds: Union[
+        roi_preds: Union[
             List[Dict[str, Union[Tuple[int, int], str]]],
             List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
         ],
@@ -204,14 +234,19 @@ class InferenceModel:
         ----------
             slide_filename: str
                 The filename of the slide to plot annotations on.
-            slide_annotations: List[Dict[str, Union[Tuple[int, int], str]]]
-                A list of annotations for the slide.
-            num_classes: int
-                The number of classes.
+            roi_preds: Union[
+                List[Dict[str, Union[Tuple[int, int], str]]],
+                List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
+            ]
+                A list of annotations predictions for the slide.
+            roi_patch_size: int
+                The size of the patches extracted from the bounding boxes.
             save_plot_path: str
                 The path to save the plot to.
             is_prob: bool
-                Whether the annotations are probabilities or not.
+                Whether the predictions are probabilities.
+            num_classes: int
+                The number of classes.
         """
         slide = openslide.OpenSlide(slide_filename)
 
@@ -224,7 +259,7 @@ class InferenceModel:
             ax[0].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
             ax[0].set_title("Predictions")
             pred_mask = np.zeros(slide.level_dimensions[-1], dtype=np.uint8).T
-            for slide_pred in slide_preds:
+            for slide_pred in roi_preds:
                 coord = np.array(slide_pred["coord"]) * scale_factor
                 pred = slide_pred["pred"]
                 x, y = coord
@@ -253,7 +288,7 @@ class InferenceModel:
                 ax[i-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
                 pred_mask = np.zeros(
                     slide.level_dimensions[-1], dtype=np.uint8).T
-                for slide_pred in slide_preds:
+                for slide_pred in roi_preds:
                     coord = np.array(slide_pred["coord"]) * scale_factor
                     pred = slide_pred["pred"][i]
                     x, y = coord
@@ -275,7 +310,7 @@ class InferenceModel:
 
     @staticmethod
     def calculate_metrics(
-        slide_preds: List[Dict[str, Union[Tuple[int, int], str]]],
+        roi_preds: List[Dict[str, Union[Tuple[int, int], str]]],
         gt_annotations: geojson.FeatureCollection
     ) -> Dict[str, float]:
         """
@@ -283,8 +318,8 @@ class InferenceModel:
 
         Parameters
         ----------
-            slide_preds: List[Dict[str, Union[Tuple[int, int], str]]]
-                A list of annotations for the slide.
+            roi_preds: List[Dict[str, Union[Tuple[int, int], str]]]
+                A list of annotations predictions for the slide.
             gt_annotations: List[Dict[str, Union[Tuple[int, int], str]]]
                 A list of ground truth annotations for the slide.
 
@@ -294,7 +329,7 @@ class InferenceModel:
                 A dictionary containing the metrics.
         """
         bboxes_by_class = {}
-        for pred in slide_preds:
+        for pred in roi_preds:
             min_x, min_y = pred["coord"]
             bbox = Polygon([
                 (min_x, min_y),
