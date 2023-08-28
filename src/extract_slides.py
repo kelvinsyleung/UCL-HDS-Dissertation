@@ -93,8 +93,8 @@ def patchify_area_and_rois(
     """
     Patchify the slide image and retrieve the relative coordinates of the bboxes in the patchified images
     """
-    (extract_min_x, extract_min_y),
-    (extract_max_x, extract_max_y) = extract_area_coord
+    (extract_min_x, extract_min_y) = extract_area_coord[0]
+    (extract_max_x, extract_max_y) = extract_area_coord[1]
     extract_area_arr = slide_arr[
         extract_min_y:extract_max_y,
         extract_min_x:extract_max_x,
