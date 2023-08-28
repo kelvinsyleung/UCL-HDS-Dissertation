@@ -228,6 +228,7 @@ class InferenceModel:
             List[Dict[str, Union[Tuple[int, int], str]]],
             List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
         ],
+        gt_annotations: geojson.FeatureCollection,
         roi_patch_size: int,
         save_plot_path: str,
         is_prob: bool = False,
@@ -245,6 +246,8 @@ class InferenceModel:
                 List[Dict[str, Union[Tuple[int, int], np.ndarray]]]
             ]
                 A list of annotations predictions for the slide.
+            gt_annotations: geojson.FeatureCollection
+                A list of ground truth annotations for the slide.
             roi_patch_size: int
                 The size of the patches extracted from the bounding boxes.
             save_plot_path: str
@@ -257,8 +260,7 @@ class InferenceModel:
         slide = openslide.OpenSlide(slide_filename)
 
         scale_factor = np.array(
-            slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0]
-                                                   )
+            slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
         scaled_patch_size = roi_patch_size * scale_factor
         if not is_prob:  # plot annotations
             fig, ax = plt.subplots(1, 2, figsize=(15, 8))
@@ -274,11 +276,11 @@ class InferenceModel:
                     int(x):int(x+scaled_patch_size[0])
                 ] = pred
             ax[0].imshow(
-                pred_mask, alpha=0.5, cmap="Purples",
+                pred_mask, alpha=0.5, cmap="Blues",
                 vmin=0, vmax=num_classes-1
             )
 
-            cmap = plt.cm.get_cmap('Purples', 4)
+            cmap = plt.cm.get_cmap('Blues', 4)
             fig.legend(
                 handles=[
                     plt.Rectangle((0, 0), 1, 1, color=cmap(i)) for i in range(1, num_classes)
@@ -309,6 +311,16 @@ class InferenceModel:
 
         ax[-1].imshow(slide.get_thumbnail(slide.level_dimensions[-1]))
         ax[-1].set_title("Ground Truth")
+
+        cmap = plt.cm.get_cmap('Blues', 4)
+        for feature in gt_annotations.features:
+            label = NAME2TYPELABELS_MAP[feature.properties["classification"]["name"]]
+            scale_factor = np.array(
+                slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
+            coords = np.array(feature.geometry.coordinates[0]) * scale_factor
+            poly = Polygon(coords)
+            x, y = poly.exterior.xy
+            ax[-1].plot(x, y, color=cmap(label), linewidth=2)
 
         plt.tight_layout()
         plt.savefig(save_plot_path)
