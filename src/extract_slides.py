@@ -87,23 +87,15 @@ def get_extract_area_coord(
 
 def patchify_area_and_rois(
     slide_arr: np.ndarray,
-    extract_area_coord: Tuple[Tuple[int, int], Tuple[int, int]],
     patch_size: int, step_size: int, scaled_bboxes: np.ndarray
 ) -> List[List[Dict[str, Union[np.ndarray, List[np.ndarray]]]]]:
     """
     Patchify the slide image and retrieve the relative coordinates of the bboxes in the patchified images
     """
-    (extract_min_x, extract_min_y) = extract_area_coord[0]
-    (extract_max_x, extract_max_y) = extract_area_coord[1]
-    extract_area_arr = slide_arr[
-        extract_min_y:extract_max_y,
-        extract_min_x:extract_max_x,
-        :
-    ]
 
     # patchify the slide image, each patch is 512x512, step is 256
     slide_patches = patchify(
-        extract_area_arr, (patch_size, patch_size, 3), step=step_size)
+        slide_arr, (patch_size, patch_size, 3), step=step_size)
 
     # create a list of dict including patches and the corresponding list of roi in relative coordinates
     area_and_rois = []
@@ -124,10 +116,10 @@ def patchify_area_and_rois(
         (min_x, min_y), (max_x, max_y) = scaled_roi_bbox
 
         # get the step index of the bbox
-        min_x_step_idx = int((min_x - extract_min_x) // step_size)
-        min_y_step_idx = int((min_y - extract_min_y) // step_size)
-        max_x_step_idx = int((max_x - extract_min_x) // step_size)
-        max_y_step_idx = int((max_y - extract_min_y) // step_size)
+        min_x_step_idx = int(min_x) // step_size
+        min_y_step_idx = int(min_y) // step_size
+        max_x_step_idx = int(max_x) // step_size
+        max_y_step_idx = int(max_y) // step_size
 
         # compile a list of patches that the bbox is in, indicated by the patch indices
         patch_list: List[Tuple[int]] = []
@@ -144,13 +136,13 @@ def patchify_area_and_rois(
         for patch_idx in patch_list:
             # get the relative coordinates of the bbox in the patch
             patch_min_x = max(
-                0, min_x - extract_min_x - patch_idx[1] * STEP_SIZE)
+                0, min_x - patch_idx[1] * STEP_SIZE)
             patch_min_y = max(
-                0, min_y - extract_min_y - patch_idx[0] * STEP_SIZE)
+                0, min_y - patch_idx[0] * STEP_SIZE)
             patch_max_x = min(
-                PATCH_SIZE, max_x - extract_min_x - patch_idx[1] * STEP_SIZE)
+                PATCH_SIZE, max_x - patch_idx[1] * STEP_SIZE)
             patch_max_y = min(
-                PATCH_SIZE, max_y - extract_min_y - patch_idx[0] * STEP_SIZE)
+                PATCH_SIZE, max_y - patch_idx[0] * STEP_SIZE)
 
             area_and_rois[patch_idx[0]][patch_idx[1]]["roi_bboxes"].append(
                 np.array([
@@ -225,7 +217,6 @@ def create_rois_dataset(annot_path: str, slide_folder: str, data_folder: str, se
                 )
                 patch_to_bboxes_list = patchify_area_and_rois(
                     slide_arr,
-                    ((0, 0), slide_arr.shape[:2]),
                     PATCH_SIZE, STEP_SIZE, scaled_bboxes
                 )
                 save_obj_detect_patch_and_roi(
@@ -336,7 +327,6 @@ if __name__ == "__main__":
     # patchify the slide image and get the relative coordinates of the bboxes in the patchified images
     patch_to_bboxes_list = patchify_area_and_rois(
         slide_arr,
-        ((0, 0), slide_arr.shape[:2]),
         PATCH_SIZE, STEP_SIZE, scaled_bboxes
     )
 
@@ -351,7 +341,7 @@ if __name__ == "__main__":
 
     # plot a single patch and its rois
     sample_slide_patch_plot_arr = cv2.imread(
-        f"{SLIDE_PATH}/sample/patch/0_0.png"
+        f"{SLIDE_PATH}/sample/patch/2_6.png"
     )
     sample_slide_patch_plot_arr = cv2.cvtColor(
         sample_slide_patch_plot_arr,
@@ -359,7 +349,7 @@ if __name__ == "__main__":
     )
 
     # draw rectangle on the patch copy
-    for annot in np.load(f"{SLIDE_PATH}/sample/roi/0_0.npy"):
+    for annot in np.load(f"{SLIDE_PATH}/sample/roi/2_6.npy"):
         cv2.rectangle(
             sample_slide_patch_plot_arr,
             annot[0].astype(int),
