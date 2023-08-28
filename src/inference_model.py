@@ -37,7 +37,7 @@ class InferenceModel:
         self, classifier_model: nn.Module, object_detection_model: nn.Module, device: str,
         slide_patch_size: int = 512, roi_patch_size: int = 512,
         white_threshold: float = 230,
-        box_nms_threshold: float = 1.0,
+        box_nms_threshold: float = 0.5,
         box_score_threshold: float = 0.04,
         box_area_threshold: float = 50,
         class_prop_threshold: float = 0.01,
@@ -185,6 +185,12 @@ class InferenceModel:
         """
         # get patch level probabilities
         prob_list = self.predict_proba(slide_filename)
+
+        if len(prob_list) == 0:
+            return {
+                "roi_preds": [],
+                "slide_class": 0
+            }
 
         # get patch level predictions by taking the argmax of the probabilities
         roi_preds = []
@@ -521,7 +527,7 @@ class InferenceModel:
                     continue
                 patch = self.roi_transform(
                     image=slide_patches[row, col, 0])["image"]
-                patch = patch.float().unsqueeze(0).to(self.device)
+                patch = patch.float().unsqueeze(0).to(self.device) / 255.0
                 pred = self.object_detection_model(patch)
                 pred_boxes = pred[0]["boxes"].cpu().detach().numpy()
                 pred_scores = pred[0]["scores"].cpu().detach().numpy()
@@ -532,15 +538,17 @@ class InferenceModel:
                     self.box_nms_threshold
                 )
 
+                nms_filtered_mask = np.zeros_like(pred_scores, dtype=bool)
+                nms_filtered_mask[nms_filtered_indices] = 1
+
                 # filter out boxes with low scores
-                score_filtered_indices = pred_scores > self.box_score_threshold
+                score_filtered_mask = pred_scores > self.box_score_threshold
 
                 # filter out boxes with small areas
-                area_filtered_indices = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (
+                area_filtered_mask = (pred_boxes[:, 2] - pred_boxes[:, 0]) * (
                     pred_boxes[:, 3] - pred_boxes[:, 1]) > self.box_area_threshold
 
-                keep = np.intersect1d(nms_filtered_indices, np.intersect1d(
-                    score_filtered_indices, area_filtered_indices))
+                keep = nms_filtered_mask & score_filtered_mask & area_filtered_mask
 
                 bbox_predictions.append({
                     "row": row,
@@ -692,7 +700,7 @@ class InferenceModel:
             for i in range(patches.shape[0]):
                 tensor_patches[i] = self.patch_transform(
                     image=patches[i])["image"]
-            tensor_patches = tensor_patches.float().to(self.device)
+            tensor_patches = tensor_patches.float().to(self.device) / 255.0
             pred = self.classifier_model(tensor_patches)
             pred = pred.softmax(dim=1)
             pred = pred.cpu().detach().numpy().reshape(
