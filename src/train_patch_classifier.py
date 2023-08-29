@@ -198,9 +198,10 @@ if __name__ == "__main__":
 
     # define the loss function and the optimizer
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    optimizer = torch.optim.SGD(
+        model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5)
+        optimizer, mode="min", factor=0.5, patience=5)
 
     start_time = time.time()
 

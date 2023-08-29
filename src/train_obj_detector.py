@@ -184,11 +184,11 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(
         params, lr=LEARNING_RATE, momentum=0.9, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5)
+        optimizer, mode="min", factor=0.5, patience=5)
 
     start_time = time.time()
 
-    set_name = f"fasterrcnn_resnet50_fpn_v2_{COLOUR_SPACE}"
+    set_name = f"fasterrcnn_resnet50_fpn_{COLOUR_SPACE}"
     # train the network
     history = run_train_loop(
         model, 2, device,
