@@ -145,12 +145,11 @@ if __name__ == "__main__":
     logging.info("main - stain normalisation setup complete")
 
     # define the hyperparameters
-    LEARNING_RATE = 1e-4
-    BATCHSIZE = 16
+    LEARNING_RATE = 1e-3
+    BATCHSIZE = 32
     EPOCHS = 100
     NUM_WORKERS = 8
     PREFETCH_FACTOR = 4
-    WEIGHT_DECAY = 1e-4
 
     num_classes = len(LABEL_MAP) + 1
 
@@ -199,8 +198,9 @@ if __name__ == "__main__":
 
     # define the loss function and the optimizer
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5)
 
     start_time = time.time()
 
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     history = run_train_loop(
         model, num_classes, device,
         train_batches, valid_batches,
-        EPOCHS, criterion, optimizer,
+        EPOCHS, criterion, optimizer, scheduler,
         set_name, eval_fn, model_type="classification",
         save_interval=50, save_path=MODEL_SAVEPATH
     )

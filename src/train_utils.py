@@ -238,7 +238,7 @@ def save_model(
 def run_train_loop(
     model: nn.Module, num_classes: int, device: torch.device,
     train_batches: DataLoader, valid_batches: DataLoader,
-    epochs: int, criterion: torch.nn.Module, optimizer: torch.optim.Optimizer,
+    epochs: int, criterion: torch.nn.Module, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
     set_name: str,
     eval_fn: Union[callable, None] = None,
     model_type: str = "classification",
@@ -265,8 +265,12 @@ def run_train_loop(
             The loss function to use.
         optimizer: torch.optim.Optimizer
             The optimizer to use.
+        scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau
+            The scheduler to use.
         set_name: str
             The name of the dataset.
+        eval_fn: Union[callable, None]
+            The evaluation function to use.
         model_type: str
             The type of model. e.g. "classification", "detection", or "segmentation".
         patience: int
@@ -329,11 +333,23 @@ def run_train_loop(
         history["train_score"].append(avg_train_score)
         history["val_score"].append(avg_val_score)
 
+        scheduler.step(avg_val_loss)
+
         best_model_val_loss, best_model_val_score, best_model_epoch = save_model(
             model, optimizer, set_name, save_interval, save_path,
             history, best_model_val_loss, best_model_val_score, best_model_epoch,
             avg_val_loss, avg_val_score, epoch
         )
+
+        # print the loss and accuracy for the epoch
+        logging.info(f"train_utils - Epoch {(epoch+1)}/{epochs}")
+        logging.info(
+            f"Train Loss: {avg_train_loss:.4f} Validation Loss: {avg_val_loss:.4f}"
+        )
+        if model_type != "detection":
+            logging.info(
+                f"Train Score: {avg_train_score:.4f} Validation Score: {avg_val_score:.4f}"
+            )
 
         if epoch > best_model_epoch + patience:
             logging.info(
@@ -348,16 +364,6 @@ def run_train_loop(
                     f"train_utils - Best model validation loss: {best_model_val_loss:.4f}, validation score: {best_model_val_score:.4f}"
                 )
             break
-
-        # print the loss and accuracy for the epoch
-        logging.info(f"train_utils - Epoch {(epoch+1)}/{epochs}")
-        logging.info(
-            f"Train Loss: {avg_train_loss:.4f} Validation Loss: {avg_val_loss:.4f}"
-        )
-        if model_type != "detection":
-            logging.info(
-                f"Train Score: {avg_train_score:.4f} Validation Score: {avg_val_score:.4f}"
-            )
 
     return history
 
