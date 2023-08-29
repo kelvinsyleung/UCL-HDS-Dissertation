@@ -36,7 +36,7 @@ if __name__ == "__main__":
     argParser.add_argument(
         "-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
     argParser.add_argument(
-        "-c", "--color_space", help="color space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
+        "-c", "--colour_space", help="colour space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
     argParser.add_argument(
         "-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
     args = argParser.parse_args()
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         f"main - MAGNIFICATION: {'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}")
 
     # colour space
-    COLOUR_SPACE = args.color_space
+    COLOUR_SPACE = args.colour_space
     logging.info(f"main - COLOR_SPACE: {COLOUR_SPACE}")
 
     if COLOUR_SPACE not in ["RGB", "CIELAB"]:

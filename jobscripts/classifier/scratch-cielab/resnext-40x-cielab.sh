@@ -37,7 +37,7 @@ module load pytorch/1.11.0/gpu
 pip install -q -r /home/rmhisyl/Scratch/diss/cnn_requirements.txt
 
 # Run the script
-python /home/rmhisyl/Scratch/diss/src/train_patch_classifier.py --project_root /home/rmhisyl/Scratch/diss --color_space CIELAB --mag 40x
+python /home/rmhisyl/Scratch/diss/src/train_patch_classifier.py -p /home/rmhisyl/Scratch/diss -c CIELAB -m 40x
 
 # Copy files back to scratch
 tar -zcvf $HOME/Scratch/diss/files_from_job_$JOB_ID.tar.gz $TMPDIR
