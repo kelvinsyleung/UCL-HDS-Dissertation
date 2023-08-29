@@ -5,11 +5,9 @@ import logging
 import random
 import time
 
-import cv2
 import torchstain
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import DataLoader
@@ -66,7 +64,6 @@ if __name__ == "__main__":
     # relative to script execution path
     OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots/train_patch_classifier"
     MODEL_SAVEPATH = f"{PROJECT_ROOT}/models/train_patch_classifier"
-    PRETRAINED_MODEL_PATH = f"{PROJECT_ROOT}/models/pretrained"
 
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
     Path(MODEL_SAVEPATH).mkdir(parents=True, exist_ok=True)
