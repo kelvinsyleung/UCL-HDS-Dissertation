@@ -152,7 +152,7 @@ class SlideROIDataset(Dataset):
             transformed = self.transform(
                 image=img, bboxes=rois, class_labels=class_labels
             )
-            img = transformed["image"]
+            img = transformed["image"] / 255.0
             rois = transformed["bboxes"]
             class_labels = transformed["class_labels"]
 
