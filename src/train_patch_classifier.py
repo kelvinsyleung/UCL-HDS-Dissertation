@@ -38,27 +38,21 @@ if __name__ == "__main__":
     argParser.add_argument(
         "-p", "--project_root", help="project root path, e.g. -p /path/to/data", type=str, default=".", required=True)
     argParser.add_argument(
-        "-c", "--color_space", help="color space: RGB, CIELAB, or BW e.g. -c RGB", type=str, default="RGB")
+        "-c", "--color_space", help="color space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
     argParser.add_argument(
         "-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
-    argParser.add_argument(
-        "-t", "--transfer_learning", help="transfer learning: True or False, e.g. -t True", type=bool, default=False)
     args = argParser.parse_args()
 
     MAGNIFICATION = args.mag
     logging.info(
         f"main - MAGNIFICATION: {'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}")
 
-    # color space
-    COLOR_SPACE = args.color_space
-    logging.info(f"main - COLOR_SPACE: {COLOR_SPACE}")
+    # colour space
+    COLOUR_SPACE = args.color_space
+    logging.info(f"main - COLOR_SPACE: {COLOUR_SPACE}")
 
-    # transfer learning
-    TRANSFER_LEARNING = args.transfer_learning
-    logging.info(f"main - TRANSFER_LEARNING: {TRANSFER_LEARNING}")
-
-    if TRANSFER_LEARNING and COLOR_SPACE != "RGB":
-        raise ValueError("Transfer learning only works with RGB color space")
+    if COLOUR_SPACE not in ["RGB", "CIELAB"]:
+        raise ValueError("Invalid color space")
 
     CLASS_MAP = NAME2TYPELABELS_MAP
     LABEL_MAP = LABELS2TYPE_MAP
@@ -67,6 +61,7 @@ if __name__ == "__main__":
     PROJECT_ROOT = args.project_root
     DATA_PATH = f"{PROJECT_ROOT}/data"
     PATCH_PATH = f"{DATA_PATH}/roi_patches"
+    NORM_PATH = f"{DATA_PATH}/norms"
 
     # relative to script execution path
     OUTPUT_PLOT_PATH = f"{PROJECT_ROOT}/output/plots/train_patch_classifier"
@@ -119,73 +114,42 @@ if __name__ == "__main__":
     logging.info(
         f"main - Number of {'mixed' if MAGNIFICATION == '*' else MAGNIFICATION} val images: {len(val_img_path)}")
 
+    if COLOUR_SPACE == "RGB":
+        mean = np.load(f"{NORM_PATH}/rgb_mean.npy")
+        std = np.load(f"{NORM_PATH}/rgb_std.npy")
+        logging.info("main - RGB mean and std loaded")
+    elif COLOUR_SPACE == "CIELAB":
+        mean = np.load(f"{NORM_PATH}/cielab_mean.npy")
+        std = np.load(f"{NORM_PATH}/cielab_std.npy")
+        logging.info("main - CIELAB mean and std loaded")
+
     # albumentations transforms
     train_transform = A.Compose([
         A.Resize(256, 256),
         A.Rotate([90, 90], p=0.5),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
+        A.Normalize(mean=mean, std=std),
         ToTensorV2()
     ])
 
     val_transform = A.Compose([
         A.Resize(256, 256),
+        A.Normalize(mean=mean, std=std),
         ToTensorV2()
     ])
 
     # stain normalisation
-    train_norm_img_selected = False
-    img_idx = len(train_img_path)//2
-    while not train_norm_img_selected:
-        train_norm_img_path = train_img_path[img_idx]
-        bw_img = cv2.cvtColor(cv2.imread(
-            train_norm_img_path), cv2.COLOR_BGR2GRAY)
-        train_norm_img_selected = bw_img.mean() <= 200
-        img_idx = (img_idx + 1) % len(train_img_path)
-
-    train_norm_img_arr = cv2.cvtColor(
-        cv2.imread(train_norm_img_path), cv2.COLOR_BGR2RGB)
-    plt.imshow(train_norm_img_arr)
-    plt.title(
-        f"Image selected for normalisation in {MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'} training set")
-    plt.savefig(
-        f"{OUTPUT_PLOT_PATH}/train_norm_img_{MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'}.png")
-    plt.close()
-    logging.info(f"main - train_norm_img_path: {train_norm_img_path}")
-
-    val_norm_img_selected = False
-    img_idx = len(val_img_path)//2
-    while not val_norm_img_selected:
-        val_norm_img_path = val_img_path[img_idx]
-        bw_img = cv2.cvtColor(cv2.imread(
-            val_norm_img_path), cv2.COLOR_BGR2GRAY)
-        val_norm_img_selected = bw_img.mean() <= 200
-        print(val_norm_img_path, val_norm_img_selected)
-        img_idx = (img_idx + 1) % len(train_img_path)
-
-    val_norm_img_arr = cv2.cvtColor(
-        cv2.imread(val_norm_img_path), cv2.COLOR_BGR2RGB)
-    plt.imshow(val_norm_img_arr)
-    plt.title(
-        f"Image selected for normalisation in {MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'} validation set")
-    plt.savefig(
-        f"{OUTPUT_PLOT_PATH}/val_norm_img{MAGNIFICATION if MAGNIFICATION != '*' else 'mixed'}.png")
-    plt.close()
-    logging.info(f"main - val_norm_img_path: {val_norm_img_path}")
-
-    train_stain_normaliser = torchstain.normalizers.MacenkoNormalizer(
+    norm_img_arr = np.load(f"{NORM_PATH}/stain_norm_img.npy")
+    stain_normaliser = torchstain.normalizers.MacenkoNormalizer(
         backend='numpy')
-    train_stain_normaliser.fit(train_norm_img_arr)
-
-    val_stain_normaliser = torchstain.normalizers.MacenkoNormalizer(
-        backend='numpy')
-    val_stain_normaliser.fit(val_norm_img_arr)
+    stain_normaliser.fit(norm_img_arr)
 
     logging.info("main - stain normalisation setup complete")
 
     # define the hyperparameters
     LEARNING_RATE = 1e-4
-    BATCHSIZE = 32
+    BATCHSIZE = 16
     EPOCHS = 100
     NUM_WORKERS = 8
     PREFETCH_FACTOR = 4
@@ -194,14 +158,7 @@ if __name__ == "__main__":
     num_classes = len(LABEL_MAP) + 1
 
     # model
-    if TRANSFER_LEARNING:
-        model = torchvision.models.resnext50_32x4d()
-        model.load_state_dict(torch.load(
-            f"{PRETRAINED_MODEL_PATH}/resnext50_32x4d-1a0047aa.pth"))
-        num_ftrs = model.fc.in_features
-        model.fc = torch.nn.Linear(num_ftrs, num_classes)
-    else:
-        model = torchvision.models.resnext50_32x4d(num_classes=num_classes)
+    model = torchvision.models.resnext50_32x4d(num_classes=num_classes)
 
     logging.info(f"main - model setup complete")
     logging.info(f"main - model: {model}")
@@ -210,9 +167,9 @@ if __name__ == "__main__":
     patch_train_dataset = PatchDataset(
         img_paths=train_img_path,
         mask_paths=train_mask_path,
-        mode=COLOR_SPACE,
+        mode=COLOUR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
-        stain_normaliser=train_stain_normaliser,
+        stain_normaliser=stain_normaliser,
         level="patch",
         transform=train_transform,
         seed=0
@@ -221,9 +178,9 @@ if __name__ == "__main__":
     patch_val_dataset = PatchDataset(
         img_paths=val_img_path,
         mask_paths=val_mask_path,
-        mode=COLOR_SPACE,
+        mode=COLOUR_SPACE,
         name_to_class_mapping=NAME2TYPELABELS_MAP,
-        stain_normaliser=val_stain_normaliser,
+        stain_normaliser=stain_normaliser,
         level="patch",
         transform=val_transform,
         seed=0
@@ -250,7 +207,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    set_name = f"resnext_{COLOR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}{'_transfer_learning' if TRANSFER_LEARNING else ''}"
+    set_name = f"resnext_{COLOUR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}"
 
     def eval_fn(output, targets, num_classes):
         tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(
