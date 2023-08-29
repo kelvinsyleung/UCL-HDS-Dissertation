@@ -56,8 +56,6 @@ class PatchDataset(Dataset):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         elif self.mode == "CIELAB":
             img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        elif self.mode == "BW":
-            img = bw_img
 
         class_id = self.name_to_class_mapping["-".join(
             img_path.split("/")[-3].split("-")[:-2])]
@@ -92,13 +90,14 @@ class PatchDataset(Dataset):
 
 class SlideROIDataset(Dataset):
     def __init__(
-        self, img_paths, roi_paths,
+        self, img_paths, roi_paths, mode: str,
         stain_normaliser: torchstain.normalizers.HENormalizer,
         white_threshold: int = 230,
         transform=None, seed=0
     ):
         self.imgs = img_paths
         self.rois = roi_paths
+        self.mode = mode
         self.stain_normaliser = stain_normaliser
         self.white_threshold = white_threshold
         self.transform = transform
@@ -131,6 +130,11 @@ class SlideROIDataset(Dataset):
             except Exception as e:
                 print(f"Error in normalising image: {img_path}")
                 print(e)
+
+        if self.mode == "RGB":
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        elif self.mode == "CIELAB":
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
         target_dict = {
             "boxes": rois,
