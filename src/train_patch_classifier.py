@@ -47,10 +47,10 @@ if __name__ == "__main__":
 
     # colour space
     COLOUR_SPACE = args.colour_space
-    logging.info(f"main - COLOR_SPACE: {COLOUR_SPACE}")
+    logging.info(f"main - COLOUR_SPACE: {COLOUR_SPACE}")
 
     if COLOUR_SPACE not in ["RGB", "CIELAB"]:
-        raise ValueError("Invalid color space")
+        raise ValueError("Invalid colour space")
 
     CLASS_MAP = NAME2TYPELABELS_MAP
     LABEL_MAP = LABELS2TYPE_MAP
