@@ -85,10 +85,12 @@ class InferenceModel:
 
         self.roi_transform = A.Compose([
             A.Resize(512, 512),
+            A.Normalize(),
             ToTensorV2()
         ])
         self.patch_transform = A.Compose([
             A.Resize(256, 256),
+            A.Normalize(),
             ToTensorV2()
         ])
 

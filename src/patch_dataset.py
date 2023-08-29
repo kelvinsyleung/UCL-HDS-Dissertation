@@ -69,7 +69,7 @@ class PatchDataset(Dataset):
             ground_truth = None
             if self.level == "pixel":  # for segmentation
                 transformed = self.transform(image=img, mask=mask)
-                img = transformed["image"].float() / 255.0
+                img = transformed["image"]
                 mask = transformed["mask"] / 255.0
                 mask[mask > 0.5] = class_id
                 mask[mask <= 0.5] = 0
@@ -77,7 +77,7 @@ class PatchDataset(Dataset):
                 ground_truth = mask
             elif self.level == "patch":  # for patch level classification
                 transformed = self.transform(image=img)
-                img = transformed["image"].float() / 255.0
+                img = transformed["image"]
                 if mask.mean() >= self.patch_area_threshold:
                     ground_truth = class_id
                 else:
@@ -148,7 +148,7 @@ class SlideROIDataset(Dataset):
             transformed = self.transform(
                 image=img, bboxes=rois, class_labels=class_labels
             )
-            img = transformed["image"].float()/255.0
+            img = transformed["image"]
             rois = transformed["bboxes"]
             class_labels = transformed["class_labels"]
 
