@@ -132,7 +132,7 @@ if __name__ == "__main__":
     logging.info("main - stain normalisation setup complete")
 
     # define the hyperparameters
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 1e-4
     BATCHSIZE = 16
     EPOCHS = 100
     NUM_WORKERS = 4
