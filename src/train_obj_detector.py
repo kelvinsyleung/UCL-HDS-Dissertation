@@ -214,4 +214,4 @@ if __name__ == "__main__":
 
     # plot the loss and accuracy history
     plot_history(
-        history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png")
+        history, save_path=f"{OUTPUT_PLOT_PATH}/{set_name}_history.png", model_type="detection")
