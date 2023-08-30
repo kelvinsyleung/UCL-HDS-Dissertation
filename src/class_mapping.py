@@ -51,7 +51,7 @@ NAME2TYPELABELS_MAP = {
 }
 
 LABELS2TYPE_MAP = {
-    1: "Non-cancerous",
-    2: "Pre-cancerous",
-    3: "Cancerous"
+    1: "Benign Tumours",
+    2: "Atypical Tumours",
+    3: "Malignant Tumours"
 }
