@@ -147,7 +147,7 @@ if __name__ == "__main__":
     # define the hyperparameters
     LEARNING_RATE = 1e-4
     BATCHSIZE = 32
-    EPOCHS = 100
+    EPOCHS = 200
     NUM_WORKERS = 8
     PREFETCH_FACTOR = 4
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
         model, num_classes, device,
         train_batches, valid_batches,
         EPOCHS, criterion, optimizer, scheduler,
-        set_name, eval_fn, model_type="classification",
+        set_name, eval_fn, model_type="classification", patience=15,
         save_interval=50, save_path=MODEL_SAVEPATH
     )
     torch.save(
