@@ -30,6 +30,7 @@ LABELS2SUBTYPE_MAP = {
 }
 
 NAME2TYPELABELS_MAP = {
+    "Group_BT": 1,
     "BENIGN": 1,  # unable to cross reference with the roi dataset from BRACS
     "Benign sure": 1,
     "Benign-sure": 1,
@@ -39,10 +40,12 @@ NAME2TYPELABELS_MAP = {
     "Pathological-benign": 1,
     "UDH": 1,
     "UDH-sure": 1,
+    "Group_AT": 2,
     "FEA": 2,
     "FEA-sure": 2,
     "ADH": 2,
     "ADH-sure": 2,
+    "Group_MT": 3,
     "DCIS": 3,
     "DCIS-sure": 3,
     "MALIGNANT": 3,
