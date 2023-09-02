@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
+@torch.autocast(device_type="cuda", dtype=torch.float16)
 def forward_step(
     model: nn.Module, num_classes: int, device: torch.device,
     criterion: torch.nn.Module, eval_fn: callable, model_type: str,
@@ -79,7 +80,7 @@ def forward_step(
 
 def train_one_epoch(
     model: nn.Module, num_classes: int, device: torch.device, train_batches: DataLoader,
-    criterion: torch.nn.Module, optimizer: torch.optim.Optimizer,
+    criterion: torch.nn.Module, optimizer: torch.optim.Optimizer, scaler: torch.cuda.amp.GradScaler,
     eval_fn: callable, model_type: str, metrics: Dict[str, float]
 ):
     """
@@ -117,10 +118,11 @@ def train_one_epoch(
         )
 
         # backward
-        loss.backward()
+        scaler.scale(loss).backward()
 
         # gradient descent or adam step
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
 
 
 def evaluate_one_epoch(
@@ -298,6 +300,8 @@ def run_train_loop(
     best_model_val_score = 0.
     best_model_epoch = 0
 
+    scaler = torch.cuda.amp.GradScaler()
+
     for epoch in range(epochs):
         # set the model in training phase
         model.train()
@@ -310,7 +314,7 @@ def run_train_loop(
         }
 
         train_one_epoch(
-            model, num_classes, device, train_batches, criterion, optimizer, eval_fn,
+            model, num_classes, device, train_batches, criterion, optimizer, scaler, eval_fn,
             model_type, metrics
         )
 
