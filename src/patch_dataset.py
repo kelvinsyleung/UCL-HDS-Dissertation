@@ -1,15 +1,18 @@
+import glob
+from pathlib import Path
+
 from torch.utils.data import Dataset
 import cv2
 import numpy as np
 import random
 import torch
 import torchstain
-from typing import Dict, Literal
+from typing import Dict, Literal, List
 
 
 class PatchDataset(Dataset):
     def __init__(
-        self, img_paths, mask_paths, mode: str,
+        self, img_paths: List[str], mask_paths: List[str], mode: str,
         name_to_class_mapping: Dict,
         stain_normaliser: torchstain.normalizers.HENormalizer,
         level: Literal["patch", "pixel"] = "patch",
@@ -47,8 +50,7 @@ class PatchDataset(Dataset):
             try:
                 img, _, _ = self.stain_normaliser.normalize(img)
             except Exception as e:
-                print(f"Error in normalising image: {img_path}")
-                print(e)
+                pass
         else:
             mask = np.zeros_like(mask)
 
@@ -90,7 +92,7 @@ class PatchDataset(Dataset):
 
 class SlideROIDataset(Dataset):
     def __init__(
-        self, img_paths, roi_paths, mode: str,
+        self, img_paths: List[str], roi_paths: List[str], mode: str,
         stain_normaliser: torchstain.normalizers.HENormalizer,
         white_threshold: int = 230,
         transform=None, seed=0
@@ -128,8 +130,7 @@ class SlideROIDataset(Dataset):
             try:
                 img, _, _ = self.stain_normaliser.normalize(img)
             except Exception as e:
-                print(f"Error in normalising image: {img_path}")
-                print(e)
+                pass
 
         if self.mode == "RGB":
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -177,3 +178,78 @@ class SlideROIDataset(Dataset):
             target_dict["iscrowd"] = torch.zeros((0,), dtype=torch.int64)
 
         return img, target_dict
+
+
+class MILDataset(Dataset):
+    def __init__(
+        self,
+        bag_of_img_folder_paths: List[Path],
+        annotation_path_root: List[Path],
+        mode: str,
+        mag: str,
+        name_to_class_mapping: Dict,
+        stain_normaliser: torchstain.normalizers.HENormalizer,
+        white_threshold: int = 230,
+        transform=None, seed=0
+    ):
+        self.bag_of_img_folder_paths = bag_of_img_folder_paths
+        self.annotation_path_root = annotation_path_root
+        self.mode = mode
+        self.mag = mag
+        self.name_to_class_mapping = name_to_class_mapping
+        self.stain_normaliser = stain_normaliser
+        self.white_threshold = white_threshold
+        self.transform = transform
+        self.seed = seed
+
+    def __len__(self):
+        return len(self.bag_of_img_folder_paths)
+
+    def __getitem__(self, idx):
+        bag_of_img_folder_path = self.bag_of_img_folder_paths[idx]
+        # print(f"bag of image folder path: {bag_of_img_folder_path}")
+
+        label = self.name_to_class_mapping[next(filter(
+            lambda x: x.stem == bag_of_img_folder_path.stem,
+            self.annotation_path_root
+        )).parent.parent.stem]
+        magnification = self.mag if self.mag != "mixed" else "*"
+        bag_of_img_paths = bag_of_img_folder_path.glob(
+            f"*-{magnification}/patch/*.png"
+        )
+        bag_of_imgs = []
+        for img_path in bag_of_img_paths:
+            img = cv2.imread(img_path.as_posix(), cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            # white thresholding
+            bw_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            is_majority_white = bw_img.mean() > self.white_threshold
+
+            if not is_majority_white:
+                try:
+                    img, _, _ = self.stain_normaliser.normalize(img)
+                except Exception as e:
+                    pass
+
+            if self.mode == "RGB":
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            elif self.mode == "CIELAB":
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+            # set seed so that the same transformation is applied to image and mask
+            if self.transform:
+                # transform the image
+                random.seed(self.seed)
+
+                transformed = self.transform(
+                    image=img
+                )
+                img = transformed["image"]
+
+                self.seed += 1
+
+            bag_of_imgs.append(img)
+
+        bag_of_imgs = torch.stack(bag_of_imgs)
+        return bag_of_imgs, label
