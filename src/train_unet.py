@@ -20,7 +20,7 @@ import segmentation_models_pytorch as smp
 from log_utils import setup_logging
 from patch_dataset import PatchDataset
 from class_mapping import NAME2TYPELABELS_MAP
-from model import UNet
+from unet_model import UNet
 from train_utils import run_train_loop, seed_worker, plot_history
 
 
