@@ -51,7 +51,10 @@ def forward_step(
         loss: torch.Tensor
             The loss of the forward pass.
     """
-    if model_type != "detection":
+    if model_type == "mil":
+        data = [d.to(device, non_blocking=True) for d in data]
+        targets = targets.to(device, non_blocking=True)
+    elif model_type != "detection":
         data = data.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
     else:
