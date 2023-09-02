@@ -1,6 +1,8 @@
 import os
 from typing import List, Dict, Union, Tuple
 import logging
+from pathlib import Path
+from shutil import rmtree
 
 import torchstain
 import numpy as np
@@ -19,8 +21,9 @@ import torchvision
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
+from tqdm import tqdm
+
 from coord_utils import pad_roi_coordinates
-from log_utils import setup_logging
 from class_mapping import LABELS2TYPE_MAP, NAME2TYPELABELS_MAP
 
 OPENSLIDE_PATH = r'C:/openslide/openslide-win64/bin'
@@ -39,11 +42,12 @@ class InferenceModel:
         obj_detect_cspace: str = "RGB",
         norm_path: str = "./data/norms",
         slide_patch_size: int = 512, roi_patch_size: int = 512,
-        white_threshold: float = 230,
+        slide_white_threshold: float = 240, roi_white_threshold: float = 230,
         box_nms_threshold: float = 0.15,
-        box_score_threshold: float = 0.05,
+        top_k_boxes: int = 10,
         class_prop_threshold: float = 0.01,
-        num_classes: int = 4
+        num_classes: int = 4,
+        classifier_batch_size: int = 32,
     ):
         """
         Parameters
@@ -56,20 +60,24 @@ class InferenceModel:
                 The device to run inference on.
             classifier_cspace: str
                 The colour space to use for the classifier model.
+            classifier_mag: str
+                The magnification of the patches to use for the classifier model.
             object_detection_cspace: str
                 The colour space to use for the object detection model.
+            norm_path: str
+                The path to the normalisation files.
             slide_patch_size: int
                 The size of the patches to extract from the slide.
             roi_patch_size: int
                 The size of the patches to extract from the bounding boxes.
-            white_threshold: float
-                The threshold to use to flag patches that are majority white.
+            slide_white_threshold: float
+                The threshold to flag a slide level patch as majority white.
+            roi_white_threshold: float
+                The threshold to flag a roi level patch as majority white.
             box_nms_threshold: float
                 The threshold to use for non-maximum suppression.
-            box_score_threshold: float
-                The threshold to use to filter out boxes with low scores.
-            box_area_threshold: float
-                The threshold to use to filter out boxes with small areas.
+            top_k_boxes: int
+                The number of top bounding boxes to use.
             class_prop_threshold: float
                 The threshold of the proportion of predicted rois of a class to flag the whole slide as that class.
 
@@ -85,11 +93,13 @@ class InferenceModel:
         self.classifier_cspace = classifier_cspace
         self.obj_detect_cspace = obj_detect_cspace
         self.resize_roi_patch = True if classifier_mag == "20x" else False
-        self.white_threshold = white_threshold
+        self.slide_white_threshold = slide_white_threshold
+        self.roi_white_threshold = roi_white_threshold
         self.box_nms_threshold = box_nms_threshold
-        self.box_score_threshold = box_score_threshold
+        self.top_k_boxes = top_k_boxes
         self.class_prop_threshold = class_prop_threshold
         self.num_classes = num_classes
+        self.classifier_batch_size = classifier_batch_size
 
         rgb_mean = np.load(f"{norm_path}/rgb_mean.npy")
         rgb_std = np.load(f"{norm_path}/rgb_std.npy")
@@ -118,8 +128,6 @@ class InferenceModel:
 
         logging.info("main - stain normalisation setup complete")
 
-        setup_logging()
-
     def predict_proba(
         self,
         slide_filename: str
@@ -144,8 +152,9 @@ class InferenceModel:
         3. Runs object detection to get bounding boxes
         4. Extracts patches from bounding boxes
         5. Runs classifier on patches
-        6. Aggregate predictions
+        6. Remove temporary files
         """
+        Path("./inference").mkdir(parents=True, exist_ok=True)
         slide = openslide.OpenSlide(slide_filename)
 
         # 1. Extract patches from slide
@@ -165,33 +174,37 @@ class InferenceModel:
         logging.info(
             f"InferenceModel.predict - Extracted bounding boxes from {len(bbox_predictions)} patches of lowest resolution"
         )
-        logging.info(f"InferenceModel.predict - slide patches indices:")
-        logging.info(
+        logging.debug(f"InferenceModel.predict - slide patches indices:")
+        logging.debug(
             f"InferenceModel.predict - {[(bbox_prediction['row'], bbox_prediction['col']) for bbox_prediction in bbox_predictions]}"
         )
 
         # 4. Extracts patches from bounding boxes
         # scale bounding boxes to absolute coordinates of the original image
-        scaled_bboxes = self._scale_bboxes(slide, bbox_predictions)
-        logging.info(f"InferenceModel.predict - Scaled bounding boxes:")
-        logging.info(f"InferenceModel.predict - {scaled_bboxes}")
+        scaled_bboxes = self._scale_bboxes_coord(slide, bbox_predictions)
+        logging.info(
+            f"InferenceModel.predict - Scaled bounding boxes coordinates")
+        logging.debug(
+            f"InferenceModel.predict - Scaled bounding boxes coordinates:")
+        logging.debug(f"InferenceModel.predict - {scaled_bboxes}")
 
         # extract patches from bounding boxes
-        roi_patches = self._extract_patches_from_rois(slide, scaled_bboxes)
+        self._extract_patches_from_rois(slide, scaled_bboxes)
         logging.info(
-            f"InferenceModel.predict - Extracted roi patches coordinates")
-        logging.info(f"InferenceModel.predict - {list(roi_patches.keys())}")
+            f"InferenceModel.predict - Extracted roi patches by scaled coordinates and saved to disk")
 
         # 5. Runs classifier on patches
-        prob_dict = self._classify_patches(roi_patches)
+        prob_dict = self._classify_patches()
         logging.info(f"InferenceModel.predict - Classified patches")
+
+        # 6. Remove temporary files
+        rmtree("./inference")
 
         return prob_dict
 
     def predict(
         self,
-        slide_filename: str,
-        return_prob: bool = False
+        slide_filename: str
     ) -> Dict[str, Union[Dict[Tuple[int, int], int], int]]:
         """
         Inference on a slide.
@@ -207,14 +220,16 @@ class InferenceModel:
                 A dictionary containing the predictions for the slide.
                 key: "roi_preds", value: A dictionary containing the patches' min coordinates  and the predicted class.
                 key: "slide_class", value: The predicted class for the whole slide.
+                key: "roi_probs", value: A dictionary containing the patches' min coordinates and the probabilities of each class.
         """
         # get patch level probabilities
         prob_dict = self.predict_proba(slide_filename)
 
         if len(prob_dict) == 0:
             return {
-                "roi_preds": [],
-                "slide_class": 0
+                "roi_preds": {},
+                "slide_class": 0,
+                "roi_probs": {}
             }
 
         # get patch level predictions by taking the argmax of the probabilities
@@ -227,22 +242,20 @@ class InferenceModel:
         patch_class_counts = np.pad(
             patch_class_counts, (0, self.num_classes - patch_class_counts.shape[0]), mode="constant")
 
-        slide_class = 0
+        # slide_class = 0
         # iterate from highest severity class to lowest
-        for i in range(patch_class_counts.shape[0])[::-1]:
-            # if the proportion of predicted rois of a class is greater than the threshold,
-            # flag the whole slide as that class
-            if patch_class_counts[i] / len(roi_preds) > self.class_prop_threshold:
-                slide_class = i
-                break
+        # for i in range(patch_class_counts.shape[0])[::-1]:
+        #     # if the proportion of predicted rois of a class is greater than the threshold,
+        #     # flag the whole slide as that class
+        #     if patch_class_counts[i] / len(roi_preds) > self.class_prop_threshold:
+        #         slide_class = i
+        #         break
 
         slide_pred = {
             "roi_preds": roi_preds,
-            "slide_class": slide_class
+            "slide_class": patch_class_counts.argmax(),
+            "roi_probs": prob_dict
         }
-
-        if return_prob:
-            slide_pred["roi_probs"] = prob_dict
 
         return slide_pred
 
@@ -284,8 +297,7 @@ class InferenceModel:
         """
         slide = openslide.OpenSlide(slide_filename)
 
-        scale_factor = np.array(
-            slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
+        scale_factor = slide.level_downsamples[0] / slide.level_downsamples[-1]
         scaled_patch_size = roi_patch_size * scale_factor
 
         if not is_prob:  # plot annotations
@@ -295,10 +307,10 @@ class InferenceModel:
             pred_mask = np.zeros(slide.level_dimensions[-1], dtype=np.uint8).T
             for coord, label in roi_preds.items():
                 x, y = coord
-                scaled_x, scaled_y = x * scale_factor[0], y * scale_factor[1]
+                scaled_x, scaled_y = x * scale_factor, y * scale_factor
                 pred_mask[
-                    int(scaled_y):int(scaled_y+scaled_patch_size[1]),
-                    int(scaled_x):int(scaled_x+scaled_patch_size[0])
+                    int(scaled_y):int(scaled_y+scaled_patch_size),
+                    int(scaled_x):int(scaled_x+scaled_patch_size)
                 ] = label
             ax[0].imshow(
                 pred_mask, alpha=0.5, cmap="Blues",
@@ -339,8 +351,6 @@ class InferenceModel:
         cmap = plt.cm.get_cmap('Blues', 4)
         for feature in gt_annotations.features:
             label = NAME2TYPELABELS_MAP[feature.properties["classification"]["name"]]
-            scale_factor = np.array(
-                slide.level_dimensions[-1]) / np.array(slide.level_dimensions[0])
             coord = np.array(feature.geometry.coordinates[0]) * scale_factor
             poly = Polygon(coord)
             x, y = poly.exterior.xy
@@ -516,23 +526,16 @@ class InferenceModel:
         """
         logging.debug(f"InferenceModel._flag_majority_white started")
         flatten_patches = slide_patches.reshape(-1, self.slide_patch_size, 3)
-        flatten_bw_patches = cv2.cvtColor(flatten_patches, cv2.COLOR_BGR2GRAY)
+        flatten_bw_patches = cv2.cvtColor(flatten_patches, cv2.COLOR_RGB2GRAY)
         flatten_bw_patches = flatten_bw_patches.reshape(
             slide_patches.shape[0]*slide_patches.shape[1],
             self.slide_patch_size*self.slide_patch_size
         )
-        majority_white = flatten_bw_patches.mean(axis=1) > self.white_threshold
+        majority_white = flatten_bw_patches.mean(axis=1) > self.slide_white_threshold
         majority_white = majority_white.reshape(
             slide_patches.shape[0],
             slide_patches.shape[1]
         )
-
-        # majority_white = np.zeros(slide_patches.shape[:2], dtype=np.bool)
-        # for row in range(slide_patches.shape[0]):
-        #     for col in range(slide_patches.shape[1]):
-        #         patch = slide_patches[row, col, 0]
-        #         bw_patch = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-        #         majority_white[row, col] = bw_patch.mean() > self.white_threshold
 
         logging.debug(f"InferenceModel._flag_majority_white ended")
 
@@ -562,50 +565,42 @@ class InferenceModel:
         """
         logging.debug(f"InferenceModel._extract_bboxes started")
         bbox_predictions = []
-        self.object_detection_model.to(self.device)
-        self.object_detection_model.eval()
-        for row in range(slide_patches.shape[0]):
-            for col in range(slide_patches.shape[1]):
-                if majority_white[row][col]:
-                    continue
-                patch = slide_patches[row, col, 0]
-                try:
-                    patch, _, _ = self.stain_normaliser.normalize(patch)
-                except Exception as e:
-                    logging.debug(
-                        f"skipped normalising slide patch at {row}-{col}: {e}")
+        with torch.no_grad():
+            self.object_detection_model.to(self.device)
+            self.object_detection_model.eval()
+            for row in range(slide_patches.shape[0]):
+                for col in range(slide_patches.shape[1]):
+                    if majority_white[row][col]:
+                        continue
+                    patch = slide_patches[row, col, 0]
+                    try:
+                        patch, _, _ = self.stain_normaliser.normalize(patch)
+                    except Exception as e:
+                        logging.debug(
+                            f"skipped normalising slide patch at {row}-{col}: {e}")
 
-                if self.obj_detect_cspace == "RGB":
-                    patch = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
-                elif self.obj_detect_cspace == "CIELAB":
-                    patch = cv2.cvtColor(patch, cv2.COLOR_BGR2LAB)
+                    if self.obj_detect_cspace == "CIELAB":
+                        patch = cv2.cvtColor(patch, cv2.COLOR_RGB2LAB)
 
-                patch = self.roi_transform(
-                    image=slide_patches[row, col, 0])["image"]
-                patch = patch.float().unsqueeze(0).to(self.device) / 255.0
-                pred = self.object_detection_model(patch)
-                pred_boxes = pred[0]["boxes"].cpu().detach().numpy()
-                pred_scores = pred[0]["scores"].cpu().detach().numpy()
+                    patch = self.roi_transform(image=patch)["image"]
 
-                nms_filtered_indices = torchvision.ops.nms(
-                    torch.from_numpy(pred_boxes),
-                    torch.from_numpy(pred_scores),
-                    self.box_nms_threshold
-                )
+                    patch = patch.float().unsqueeze(0).to(self.device) / 255.0
+                    pred = self.object_detection_model(patch)
+                    pred_boxes = pred[0]["boxes"].cpu().detach().numpy()
+                    pred_scores = pred[0]["scores"].cpu().detach().numpy()
 
-                nms_filtered_mask = np.zeros_like(pred_scores, dtype=bool)
-                nms_filtered_mask[nms_filtered_indices] = 1
+                    nms_filtered_indices = torchvision.ops.nms(
+                        torch.from_numpy(pred_boxes),
+                        torch.from_numpy(pred_scores),
+                        self.box_nms_threshold
+                    )
+                    keep = nms_filtered_indices[:self.top_k_boxes]
 
-                # filter out boxes with low scores
-                score_filtered_mask = pred_scores > self.box_score_threshold
-
-                keep = nms_filtered_mask & score_filtered_mask
-
-                bbox_predictions.append({
-                    "row": row,
-                    "col": col,
-                    "pred_boxes": pred_boxes[keep]
-                })
+                    bbox_predictions.append({
+                        "row": row,
+                        "col": col,
+                        "pred_boxes": pred_boxes[keep]
+                    })
 
         logging.debug(f"InferenceModel._extract_bboxes ended")
         self.object_detection_model.cpu()
@@ -614,7 +609,7 @@ class InferenceModel:
 
         return bbox_predictions
 
-    def _scale_bboxes(
+    def _scale_bboxes_coord(
         self,
         slide: openslide.OpenSlide,
         bbox_predictions: List[Dict[str, Union[int, np.ndarray]]]
@@ -639,9 +634,8 @@ class InferenceModel:
         logging.debug(f"InferenceModel._scale_bboxes started")
         scaled_bboxes = []
         # scaling factor between lowest resolution and highest resolution in [width, height]
-        scale_factor = np.array(
-            slide.level_dimensions[0]
-        ) / np.array(slide.level_dimensions[-1])
+        scale_factor = int(
+            slide.level_downsamples[-1] / slide.level_downsamples[0])
 
         for bbox_prediction in bbox_predictions:
             boxes = bbox_prediction["pred_boxes"]
@@ -650,7 +644,7 @@ class InferenceModel:
             # scale boxes to original image size using absolute coordinates
             offset = np.array([col, row, col, row]) * self.slide_patch_size
             boxes = boxes + offset
-            boxes = boxes.reshape(-1, 2, 2) * scale_factor[::-1]
+            boxes = boxes.reshape(-1, 2, 2) * scale_factor
             boxes = boxes.reshape(-1, 4)
             scaled_bboxes.append(boxes)
 
@@ -662,14 +656,9 @@ class InferenceModel:
         self,
         slide: openslide.OpenSlide,
         scaled_bboxes: List[np.ndarray]
-    ) -> Dict[Tuple[int, int], np.ndarray]:
+    ):
         """
-        Extract patches from bounding boxes.
-
-        Padding is added to the bounding boxes so that:
-        1. The width and height of the bounding boxes are multiples of roi_patch_size.
-        2. The min x and y coordinates are multiples of roi_patch_size.
-        3. The new coordinates are within the slide dimensions.
+        Extract patches from bounding boxes. Then resize and save to disk to reduce memory usage.
 
         Parameters
         ----------
@@ -677,14 +666,9 @@ class InferenceModel:
                 The slide to extract patches from.
             scaled_bboxes: List[np.ndarray]
                 A list of scaled bounding boxes.
-
-        Returns
-        -------
-            roi_patches: Dict[Tuple[int, int], np.ndarray]
-                A dictionary containing the patches' min coordinates and the corresponding array.
         """
         logging.debug(f"InferenceModel._extract_patches_from_rois started")
-        roi_patches = {}
+        roi_patches_saved = set()
         mag_factor = 2 if self.resize_roi_patch else 1
         for bboxes in scaled_bboxes:
             for bbox in bboxes:
@@ -697,52 +681,52 @@ class InferenceModel:
                     self.roi_patch_size * mag_factor,
                     for_inference=True
                 )
-
-                roi_region = slide.read_region(
-                    min_coord,
-                    0,
-                    tuple(np.subtract(max_coord, min_coord))
-                ).convert("RGB")
+                level = mag_factor - 1
+                size = (
+                    np.subtract(max_coord, min_coord) / (
+                        slide.level_downsamples[level] / slide.level_downsamples[0]
+                    ) + 1 # add 1 to include the last pixel so it is a multiple of 256
+                ).astype(int)
+                roi_region = slide.read_region(min_coord, level, size)
                 roi_region = np.array(roi_region)
 
-                # resize according to classifier model's trained magnification
-                if self.resize_roi_patch:
-                    roi_region = cv2.resize(
-                        roi_region, np.ceil([
-                            roi_region.shape[1]/2,
-                            roi_region.shape[0]/2
-                        ]).astype(int)
-                    )
-
-                # print(roi_region.shape)
                 region_patches = patchify(
                     roi_region,
-                    (self.roi_patch_size, self.roi_patch_size, 3),
-                    step=self.roi_patch_size
+                    (
+                        int(self.roi_patch_size / mag_factor),
+                        int(self.roi_patch_size / mag_factor),
+                        3
+                    ),
+                    step=int(self.roi_patch_size / mag_factor)
                 )
 
                 for row in range(region_patches.shape[0]):
                     for col in range(region_patches.shape[1]):
+                        min_patch_coord = (
+                            min_coord[0] + col * self.roi_patch_size,
+                            min_coord[1] + row * self.roi_patch_size
+                        )
+                        if min_patch_coord in roi_patches_saved:
+                            continue
+
                         patch = region_patches[row, col, 0]
 
                         # if patch is majority white, skip
-                        if cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY).mean() > self.white_threshold:
+                        if cv2.cvtColor(patch, cv2.COLOR_RGB2GRAY).mean() > self.roi_white_threshold:
                             continue
-                        min_patch_coord = (
-                            min_coord[0] + col*self.roi_patch_size,
-                            min_coord[1] + row*self.roi_patch_size
+
+                        patch = cv2.resize(patch, (256, 256))
+                        np.save(
+                            f"./inference/{min_patch_coord[0]}_{min_patch_coord[1]}.npy",
+                            patch
                         )
 
-                        if min_patch_coord not in roi_patches:
-                            roi_patches[min_patch_coord] = patch
+                        roi_patches_saved.add(min_patch_coord)
 
         logging.debug(f"InferenceModel._extract_patches_from_rois ended")
 
-        return dict(sorted(roi_patches.items()))
-
     def _classify_patches(
-        self,
-        roi_patches: Dict[Tuple[int, int], np.ndarray]
+        self
     ) -> Dict[Tuple[int, int], np.ndarray]:
         """
         Classify patches extracted from the predicted bounding boxes.
@@ -759,51 +743,45 @@ class InferenceModel:
         """
         logging.debug(f"InferenceModel._classify_patches started")
         patch_predictions = {}
-        self.classifier_model.to(self.device)
-        self.classifier_model.eval()
-        roi_patch_keys = list(roi_patches.keys())
-        roi_patch_values = list(roi_patches.values())
-        roi_patch_values = np.array(roi_patch_values)
-        roi_patch_values = roi_patch_values.reshape(
-            -1, self.roi_patch_size, self.roi_patch_size, 3
-        )
+        with torch.no_grad():
+            self.classifier_model.to(self.device)
+            self.classifier_model.eval()
+            roi_patch_paths = list(Path("./inference").glob("*.npy"))
 
-        if len(roi_patch_values) == 0:
-            return patch_predictions
+            if len(roi_patch_paths) == 0:
+                return patch_predictions
 
-        # create batches of 16 patches
-        batches = np.array_split(
-            roi_patch_values,
-            np.ceil(len(roi_patch_values) / 8)
-        )
+            # create batches of patches
+            batches = np.array_split(
+                roi_patch_paths,
+                np.ceil(len(roi_patch_paths) / self.classifier_batch_size)
+            )
 
-        roi_patch_predictions = []
-        for batch in batches:
-            tensor_patches = torch.zeros(batch.shape[0], 3, 256, 256)
-            for i in range(batch.shape[0]):
-                patch = batch[i]
-                try:
-                    patch, _, _ = self.stain_normaliser.normalize(patch)
-                except Exception:
-                    pass
+            roi_patch_predictions = []
+            for batch in tqdm(batches):
+                tensor_patches = torch.zeros(len(batch), 3, 256, 256)
+                for i, path in enumerate(batch):
+                    patch = np.load(path)
+                    try:
+                        patch, _, _ = self.stain_normaliser.normalize(patch)
+                    except Exception:
+                        pass
 
-                if self.classifier_cspace == "RGB":
-                    patch = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
-                elif self.classifier_cspace == "CIELAB":
-                    patch = cv2.cvtColor(patch, cv2.COLOR_BGR2LAB)
+                    if self.classifier_cspace == "CIELAB":
+                        patch = cv2.cvtColor(patch, cv2.COLOR_RGB2LAB)
 
-                tensor_patches[i] = self.patch_transform(
-                    image=batch[i])["image"]
-            tensor_patches = tensor_patches.to(self.device)
-            pred = self.classifier_model(tensor_patches)
-            pred = pred.softmax(dim=1)
-            pred = pred.cpu().detach().numpy().tolist()
+                    tensor_patches[i] = self.patch_transform(image=patch)[
+                        "image"]
+                tensor_patches = tensor_patches.to(self.device)
+                pred = self.classifier_model(tensor_patches)
+                pred = pred.softmax(dim=1)
+                pred = pred.cpu().detach().numpy().tolist()
 
-            roi_patch_predictions.extend(pred)
+                roi_patch_predictions.extend(pred)
 
-        for key, pred in zip(roi_patch_keys, roi_patch_predictions):
-            if key not in patch_predictions:
-                patch_predictions[key] = pred
+                for i, path in enumerate(batch):
+                    patch_predictions[tuple(
+                        map(int, path.stem.split("_")))] = pred[i]
 
         logging.debug(f"InferenceModel._classify_patches ended")
         self.classifier_model.cpu()
