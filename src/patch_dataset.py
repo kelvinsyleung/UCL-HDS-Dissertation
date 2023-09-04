@@ -217,6 +217,7 @@ class MILDataset(Dataset):
         bag_of_img_paths = bag_of_img_folder_path.glob(
             f"*-{magnification}/patch/*.png"
         )
+        label = label - 1  # ignore background class
         bag_of_imgs = []
         for img_path in bag_of_img_paths:
             img = cv2.imread(img_path.as_posix(), cv2.IMREAD_COLOR)

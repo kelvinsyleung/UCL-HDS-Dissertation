@@ -20,7 +20,7 @@ class MILModel(nn.Module):
         feat_extractor: nn.Module,
         feat_dim: int,
         num_classes: int,
-        feat_extractor_batch_size: int = 16,
+        feat_extractor_batch_size: int = 8,
     ):
         super(MILModel, self).__init__()
         feat_extractor_module = list(feat_extractor.children())[:-1]
@@ -29,6 +29,7 @@ class MILModel(nn.Module):
             param.requires_grad = False
 
         self.feat_extractor_batch_size = feat_extractor_batch_size
+        self.feat_dim = feat_dim
 
         self.attention_pooling = AttentionPooling(feat_dim)
         self.classifier = nn.Sequential(
@@ -42,9 +43,9 @@ class MILModel(nn.Module):
         for bag in bags:
             bag_batches = torch.split(bag, self.feat_extractor_batch_size)
             with torch.no_grad():
-                instance_features = torch.zeros((len(bag), 2048)).to(bag.device)
+                instance_features = torch.zeros((len(bag), self.feat_dim)).to(bag.device)
                 for i, batch in enumerate(bag_batches):
-                    instance_features[i*8:i*8+len(batch)] = self.feat_extractor(batch).view(-1, 2048)
+                    instance_features[i*8:i*8+len(batch)] = self.feat_extractor(batch).view(-1, self.feat_dim)
 
             # pooling
             mean_pool = torch.mean(instance_features, dim=0)
