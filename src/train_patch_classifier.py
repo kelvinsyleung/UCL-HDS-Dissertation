@@ -201,11 +201,11 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(
         model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5)
+        optimizer, mode="min", factor=0.1, patience=5, verbose=True)
 
     start_time = time.time()
 
-    set_name = f"resnext_{COLOUR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}"
+    set_name = f"resnext_101_{COLOUR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}"
 
     def eval_fn(output, targets, num_classes):
         tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(
@@ -222,7 +222,6 @@ if __name__ == "__main__":
     )
     torch.save(
         {
-            "epoch": EPOCHS,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "history": history,
