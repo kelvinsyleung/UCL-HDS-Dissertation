@@ -52,7 +52,6 @@ if __name__ == "__main__":
     if COLOUR_SPACE not in ["RGB", "CIELAB"]:
         raise ValueError("Invalid colour space")
 
-    CLASS_MAP = NAME2TYPELABELS_MAP
     LABEL_MAP = LABELS2TYPE_MAP
 
     # absolute path for loading patches
@@ -146,15 +145,15 @@ if __name__ == "__main__":
 
     # define the hyperparameters
     LEARNING_RATE = 1e-4
-    BATCHSIZE = 32
+    BATCHSIZE = 8
     EPOCHS = 200
-    NUM_WORKERS = 8
-    PREFETCH_FACTOR = 4
+    NUM_WORKERS = 16
+    PREFETCH_FACTOR = 2
 
-    num_classes = len(LABEL_MAP) + 1
+    num_classes = len(LABEL_MAP)
 
     # model
-    model = torchvision.models.resnext50_32x4d(num_classes=num_classes)
+    model = torchvision.models.resnext101_64x4d(num_classes=num_classes)
 
     logging.info(f"main - model setup complete")
     logging.info(f"main - model: {model}")
@@ -218,7 +217,7 @@ if __name__ == "__main__":
         train_batches, valid_batches,
         EPOCHS, criterion, optimizer, scheduler,
         set_name, eval_fn, model_type="classification", patience=15,
-        save_interval=50, save_path=MODEL_SAVEPATH
+        save_interval=10, save_path=MODEL_SAVEPATH
     )
     torch.save(
         {
