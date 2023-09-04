@@ -1,60 +1,29 @@
-NAME2SUBTYPELABELS_MAP = {
-    "BENIGN": 1,  # unable to cross reference with the roi dataset from BRACS
-    "Benign sure": 1,
-    "Benign-sure": 1,
-    # unable to cross reference with the roi dataset from BRACS
-    "Pathological-benign (Benign-sure)": 1,
-    "Pathologica benign": 2,
-    "Pathological-benign": 2,
-    "UDH": 3,
-    "UDH-sure": 3,
-    "FEA": 4,
-    "FEA-sure": 4,
-    "ADH": 5,
-    "ADH-sure": 5,
-    "DCIS": 6,
-    "DCIS-sure": 6,
-    "MALIGNANT": 7,
-    "Malignant": 7,
-    "Malignant-sure": 7
-}
-
-LABELS2SUBTYPE_MAP = {
-    1: "Type_N",
-    2: "Type_PB",
-    3: "Type_UDH",
-    4: "Type_FEA",
-    5: "Type_ADH",
-    6: "Type_DCIS",
-    7: "Type_IC"
-}
-
 NAME2TYPELABELS_MAP = {
-    "Group_BT": 1,
-    "BENIGN": 1,  # unable to cross reference with the roi dataset from BRACS
-    "Benign sure": 1,
-    "Benign-sure": 1,
+    "Group_BT": 0,
+    "BENIGN": 0,  # unable to cross reference with the roi dataset from BRACS
+    "Benign sure": 0,
+    "Benign-sure": 0,
     # unable to cross reference with the roi dataset from BRACS
-    "Pathological-benign (Benign-sure)": 1,
-    "Pathologica benign": 1,
-    "Pathological-benign": 1,
-    "UDH": 1,
-    "UDH-sure": 1,
+    "Pathological-benign (Benign-sure)": 0,
+    "Pathologica benign": 0,
+    "Pathological-benign": 0,
+    "UDH": 0,
+    "UDH-sure": 0,
     "Group_AT": 2,
-    "FEA": 2,
-    "FEA-sure": 2,
-    "ADH": 2,
-    "ADH-sure": 2,
-    "Group_MT": 3,
-    "DCIS": 3,
-    "DCIS-sure": 3,
-    "MALIGNANT": 3,
-    "Malignant": 3,
-    "Malignant-sure": 3
+    "FEA": 1,
+    "FEA-sure": 1,
+    "ADH": 1,
+    "ADH-sure": 1,
+    "Group_MT": 2,
+    "DCIS": 2,
+    "DCIS-sure": 2,
+    "MALIGNANT": 2,
+    "Malignant": 2,
+    "Malignant-sure": 2
 }
 
 LABELS2TYPE_MAP = {
-    1: "Benign Tumours",
-    2: "Atypical Tumours",
-    3: "Malignant Tumours"
+    0: "Benign Tumours",
+    1: "Atypical Tumours",
+    2: "Malignant Tumours"
 }
