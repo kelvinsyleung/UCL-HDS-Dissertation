@@ -153,7 +153,7 @@ if __name__ == "__main__":
     num_classes = len(LABEL_MAP)
 
     # model
-    model = torchvision.models.resnext101_64x4d(num_classes=num_classes)
+    model = torchvision.models.resnext101_32x8d(num_classes=num_classes)
 
     logging.info(f"main - model setup complete")
     logging.info(f"main - model: {model}")
