@@ -9,7 +9,7 @@ NAME2TYPELABELS_MAP = {
     "Pathological-benign": 0,
     "UDH": 0,
     "UDH-sure": 0,
-    "Group_AT": 2,
+    "Group_AT": 1,
     "FEA": 1,
     "FEA-sure": 1,
     "ADH": 1,
