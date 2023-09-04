@@ -17,7 +17,7 @@ from albumentations.pytorch import ToTensorV2
 import torch
 from torch.utils.data import DataLoader
 
-from class_mapping import NAME2SUBTYPELABELS_MAP
+from class_mapping import NAME2TYPELABELS_MAP
 from patch_dataset import PatchDataset
 from log_utils import setup_logging
 
@@ -200,7 +200,7 @@ if __name__ == "__main__":
         img_paths=train_20x_img_path,
         mask_paths=train_20x_mask_path,
         mode="RGB",
-        name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        name_to_class_mapping=NAME2TYPELABELS_MAP,
         stain_normaliser=stain_normaliser,
         level="pixel",
         transform=train_transform,
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         img_paths=train_20x_img_path,
         mask_paths=train_20x_mask_path,
         mode="CIELAB",
-        name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        name_to_class_mapping=NAME2TYPELABELS_MAP,
         stain_normaliser=stain_normaliser,
         level="pixel",
         transform=train_transform,
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         img_paths=train_20x_img_path,
         mask_paths=train_20x_mask_path,
         mode="BW",
-        name_to_class_mapping=NAME2SUBTYPELABELS_MAP,
+        name_to_class_mapping=NAME2TYPELABELS_MAP,
         stain_normaliser=stain_normaliser,
         level="pixel",
         transform=train_transform,
