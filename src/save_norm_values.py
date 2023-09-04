@@ -10,8 +10,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torchstain
+from class_mapping import NAME2TYPELABELS_MAP
 
 from log_utils import setup_logging
+
+
+def save_sample_weights(magnification: str):
+    train_patches_paths = sorted(
+        glob.glob(f"{PATCH_PATH}/train/**/*-{magnification if magnification != 'mixed' else '*'}"))
+
+    train_img_path = []
+    train_mask_path = []
+
+    for roi in train_patches_paths:
+        train_img_path.extend(glob.glob(roi + "/patch/*.png"))
+        train_mask_path.extend(glob.glob(roi + "/mask/*.png"))
+
+    train_img_path.sort()
+    train_mask_path.sort()
+
+    assert len(train_img_path) == len(
+        train_mask_path), "Number of images and masks should be equal"
+
+    logging.info(
+        f"main - Number of {magnification} train images: {len(train_img_path)}")
+
+    class_counts = np.array([0, 0, 0])
+    naiive_gt = []
+    for img_path in train_img_path:
+        name = "-".join(Path(img_path).parent.parent.stem.split("-")[0:-2])
+        label = NAME2TYPELABELS_MAP[name]
+        naiive_gt.append(label)
+        class_counts[label] += 1
+
+    class_weights = (1 / class_counts) / (1 / class_counts).sum()
+
+    sample_weights = np.array([class_weights[label] for label in naiive_gt])
+    np.save(f"{NORM_PATH}/sample_weights_{magnification}.npy", sample_weights)
+
 
 if __name__ == "__main__":
     setup_logging()
@@ -120,3 +156,8 @@ if __name__ == "__main__":
     np.save(f"{NORM_PATH}/cielab_mean.npy", cielab_mean)
     np.save(f"{NORM_PATH}/cielab_std.npy", cielab_std)
     logging.info("Saved mean and std values for RGB and CIELAB channels")
+
+    # class weights
+    save_sample_weights("20x")
+    save_sample_weights("40x")
+    save_sample_weights("mixed")
