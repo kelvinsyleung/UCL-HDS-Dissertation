@@ -3,8 +3,8 @@
 # Request GPU
 #$ -l gpu=1
 
-# Request 12hrs
-#$ -l h_rt=12:00:00
+# Request 24hrs
+#$ -l h_rt=24:00:00
 
 # Request 32GB RAM
 #$ -l mem=32G
