@@ -2,6 +2,7 @@ from typing import Literal, Union, Dict, List, Tuple
 import random
 from pathlib import Path
 import logging
+import gc
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -258,7 +259,7 @@ def run_train_loop(
             The model to train.
         num_classes: int
             The number of classes in the dataset.
-        device: torch.device
+        device: str
             The device to use for training.
         train_batches: DataLoader
             The training data loader.
@@ -371,6 +372,11 @@ def run_train_loop(
                     f"train_utils - Best model validation loss: {best_model_val_loss:.4f}, validation score: {best_model_val_score:.4f}"
                 )
             break
+
+        if model_type == "mil" and device == "cuda":
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+            gc.collect()
 
     return history
 
