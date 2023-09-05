@@ -10,7 +10,7 @@ import torchstain
 import numpy as np
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import torchvision
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -185,13 +185,25 @@ if __name__ == "__main__":
     worker_g = torch.Generator()
     worker_g.manual_seed(0)
 
+    sample_weights = np.load(
+        f"{NORM_PATH}/sample_weights_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}.npy"
+    )
+
+    assert len(sample_weights) == len(
+        patch_train_dataset), "Number of sample weights should be equal to number of training samples"
+
+    sampler = WeightedRandomSampler(
+        torch.from_numpy(sample_weights),
+        len(patch_train_dataset)
+    )
     train_batches = DataLoader(
-        patch_train_dataset, batch_size=BATCHSIZE, shuffle=True,
-        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
+        patch_train_dataset, batch_size=BATCHSIZE,
+        num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR,
+        sampler=sampler
     )
     worker_g.manual_seed(0)
     valid_batches = DataLoader(
-        patch_val_dataset, batch_size=BATCHSIZE, shuffle=False,
+        patch_val_dataset, batch_size=BATCHSIZE,
         num_workers=NUM_WORKERS, worker_init_fn=seed_worker, pin_memory=True, prefetch_factor=PREFETCH_FACTOR
     )
 
