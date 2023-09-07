@@ -44,6 +44,7 @@ def save_sample_weights(magnification: str):
         class_counts[label] += 1
 
     class_weights = (1 / class_counts) / (1 / class_counts).sum()
+    np.save(f"{NORM_PATH}/class_weights.npy", class_weights)
 
     sample_weights = np.array([class_weights[label] for label in naiive_gt])
     np.save(f"{NORM_PATH}/sample_weights_{magnification}.npy", sample_weights)
