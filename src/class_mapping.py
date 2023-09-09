@@ -1,9 +1,8 @@
 NAME2TYPELABELS_MAP = {
     "Group_BT": 0,
-    "BENIGN": 0,  # unable to cross reference with the roi dataset from BRACS
+    "BENIGN": 0,
     "Benign sure": 0,
     "Benign-sure": 0,
-    # unable to cross reference with the roi dataset from BRACS
     "Pathological-benign (Benign-sure)": 0,
     "Pathologica benign": 0,
     "Pathological-benign": 0,

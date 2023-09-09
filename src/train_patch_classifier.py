@@ -145,8 +145,8 @@ if __name__ == "__main__":
 
     # define the hyperparameters
     LEARNING_RATE = 1e-4
-    BATCHSIZE = 16
-    EPOCHS = 50
+    BATCHSIZE = 8
+    EPOCHS = 100
     NUM_WORKERS = 16
     PREFETCH_FACTOR = 2
 
@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    set_name = f"local_resnext_101_{COLOUR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}"
+    set_name = f"weighted_resnext_101_{COLOUR_SPACE}_{'mixed' if MAGNIFICATION == '*' else MAGNIFICATION}"
 
     def eval_fn(output, targets, num_classes):
         tp, fp, fn, tn = smp.metrics.get_stats(torch.argmax(
@@ -230,7 +230,7 @@ if __name__ == "__main__":
         model, num_classes, device,
         train_batches, valid_batches,
         EPOCHS, criterion, optimizer, scheduler,
-        set_name, eval_fn, model_type="classification", patience=10,
+        set_name, eval_fn, model_type="classification", patience=15,
         save_interval=10, save_path=MODEL_SAVEPATH
     )
     torch.save(
