@@ -47,6 +47,10 @@ if __name__ == "__main__":
         "-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
     argParser.add_argument(
         "-b", "--classifier_batch_size", help="classifier batch size, e.g. -b 128", type=int, default=128)
+    argParser.add_argument(
+        "-k", "--top_k_boxes", help="number of boxes retrieve per tile", type=int, default=10)
+    argParser.add_argument(
+        "-n", "--nms_threshold", help="non-max suppression threshold", type=float, default=0.3)
     args = argParser.parse_args()
 
     # absolute path for loading patches
@@ -65,6 +69,8 @@ if __name__ == "__main__":
     CLASSIFIER_CSPACE = args.obj_detect_colour_space
     PATCH_MAGNIFICATION = args.mag
     CLASSIFIER_BATCH_SIZE = args.classifier_batch_size
+    TOP_K_BOXES = args.top_k_boxes
+    NMS_THRESHOLD = args.nms_threshold
 
     if OBJ_DETECT_CSPACE == "RGB":
         mean = np.load(f"{NORM_PATH}/rgb_mean.npy")
@@ -97,6 +103,8 @@ if __name__ == "__main__":
         norm_path=NORM_PATH,
         slide_patch_size=SLIDE_PATCH_SIZE,
         roi_patch_size=ROI_PATCH_SIZE,
+        top_k_boxes=TOP_K_BOXES,
+        box_nms_threshold=NMS_THRESHOLD,
         num_classes=num_classes,
         classifier_batch_size=CLASSIFIER_BATCH_SIZE
     )
@@ -162,12 +170,4 @@ if __name__ == "__main__":
                 roi_patch_size=inference_model.roi_patch_size,
                 save_plot_path=f"{OUTPUT_PLOT_PATH}/{Path(test_wsi_path).stem}_pseudo_annot.png",
                 is_prob=False
-            )
-            inference_model.plot_annotations(
-                test_wsi_path,
-                test_set_roi_probs[i],
-                annot,
-                roi_patch_size=inference_model.roi_patch_size,
-                save_plot_path=f"{OUTPUT_PLOT_PATH}/{Path(test_wsi_path).stem}_class_prob.png",
-                is_prob=True
             )
