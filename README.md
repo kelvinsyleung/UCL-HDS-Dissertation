@@ -73,6 +73,35 @@ ANNOT_PATH - BRACS_WSI
     └── test
          .
 
+PROJECT_PATH
+
+    ├── data
+    |     ├── norms
+    |     |      └── <normalisation_values>.npy ...
+    |     ├── roi_patches
+    |     |      ├── sample ...
+    |     |      ├── train ...
+    |     |      └── val ...
+    |     ├── roi_test_imgs (ROI only test set images from BRACS)
+    |     |      ├── 0_N ...
+    |     |      ├── 1_PB ...
+    |     |      .
+    |     |      └── 6_IC ...
+    |     └── slide_patches
+    |            ├── sample ...
+    |            ├── train ...
+    |            └── val ...
+    ├── models
+    |     ├── train_obj_detector ...
+    |     └── train_patch_classifier ...
+    |     
+    └── output
+          └── plots
+                ├── evaluation
+                .
+                ├── train_obj_detector
+                └── train_patch_classifier
+
 
 ## Run
 ### Download the dataset from BRACS for processing
@@ -87,35 +116,32 @@ The directories structure from BRACS should be identical to above by default. Ot
 Most Python scripts includes required arguments, use `python <script>.py -h` to read the details
 
 #### Patch Level Feature Extraction Module and Slide Level Feature Extraction Module
-use the `-p` or `--project_root` flag to indicate where to export the extracted thumbnails with bboxes
-
-use the `-r` or `--raw_data_folder` flag to indicate where are the BRACS raw data files
-
-use the `-a` or `--annot_folder` flag to indicate where are the processed BRACS annotation files
-
-use the `-t` or `--tile_size` flag to indicate the patch tile size in pixels
-
-use the `-s` or `--step_size` flag to indicate the offset in pixels to extract the next tile
-
 ```python
-python extract_patches.py -p <project_path>  -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
-python extract_slides.py -p <project_path>  -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
+python src/extract_patches.py -p <project_path> -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
+python src/extract_slides.py -p <project_path> -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/
 ```
 
 #### Sample patch transformations and augmentations
-use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
-
 ```python
-python patch_transform_showcase.py -p <project_path>
+python src/patch_transform_showcase.py -p <project_path>
 ```
 
-#### Patch level Classifier (Refactoring)
-use the `-p` or `--project_root` flag to indicate where are the patches extracted in the previous step (required)
-
-use the `-c` or `--color_space` option to indicate the target colour space for transformation (`RGB`, `CIELAB`, `BW`)
-
-use the `-m` or `--mag` option to indicate the specific magnification of patches used to train the model (`20x`, `40x`)
+#### Slide level ROI detector
 
 ```python
-python train_unet.py --project_root --color_space <color_space> --mag <magnification>
+python src/train_obj_detector.py --project_root <project_path> --color_space <color_space>
+python src/test_obj_detector.py -p <project_path> -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/ -c <color_space> -k <top_k_boxes> -n <nms_threshold>
+```
+
+#### Patch level Classifier
+
+```python
+python src/train_patch_classifier.py --project_root <project_path> --color_space <color_space> --mag <magnification>
+python src/test_patch_classifier.py -p <project_path> -c <color_space> -m <magnification>
+```
+
+#### Inference Model
+
+```python
+python src/run_inference.py -p <project_path> -r /some/path/BRACS/BRACS_WSI/ -a /some/path/BRACS_WSI_Annotations/ -s <slide_tile_size> -t <roi_tile_size> -c <classifier_colour_space> -o <obj_detect_colour_space> -m <classifier_magnification> -b <classifier_batch_size> -k <top_k_boxes> -n <nms_threshold>
 ```
