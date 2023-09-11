@@ -43,9 +43,8 @@ class InferenceModel:
         norm_path: str = "./data/norms",
         slide_patch_size: int = 512, roi_patch_size: int = 512,
         slide_white_threshold: float = 240, roi_white_threshold: float = 230,
-        box_nms_threshold: float = 0.3,
-        top_k_boxes: int = 10,
-        class_prob_threshold: float = 0.75,
+        box_nms_threshold: float = 0.15,
+        top_k_boxes: int = 15,
         num_classes: int = 3,
         classifier_batch_size: int = 128,
     ):
@@ -78,10 +77,6 @@ class InferenceModel:
                 The threshold to use for non-maximum suppression.
             top_k_boxes: int
                 The number of top bounding boxes to use.
-            class_prob_threshold: float
-                The threshold of the multilabel probabilities to determine if the slide contains a class.
-
-                Higher severity class precedes lower, even if the proportion of the lower severity class is greater.
             num_classes: int
                 The number of classes. Currently only supports 3 classes.
         """
@@ -97,7 +92,6 @@ class InferenceModel:
         self.roi_white_threshold = roi_white_threshold
         self.box_nms_threshold = box_nms_threshold
         self.top_k_boxes = top_k_boxes
-        self.class_prob_threshold = class_prob_threshold
         self.num_classes = num_classes
         self.classifier_batch_size = classifier_batch_size
 
@@ -267,23 +261,15 @@ class InferenceModel:
         for coord in logits_dict.keys():
             roi_preds[coord] = np.argmax(logits_dict[coord])
 
-        # compute whole slide level prediction ver1
-        # patch_class_counts = np.bincount(list(roi_preds.values()))
-        # patch_class_counts = np.pad(
-        #     patch_class_counts, (0, self.num_classes - patch_class_counts.shape[0]), mode="constant")
-        # slide_class = patch_class_counts.argmax()
-
-        # compute whole slide level prediction ver2
+        # compute whole slide level prediction
         # take the mean of the logits of all the patches
         mean_logits = np.array(list(logits_dict.values())).mean(axis=0)
 
         # convert logits to probabilities as a multilabel problem
         slide_multilabels = torch.sigmoid(torch.from_numpy(mean_logits))
 
-        # threshold the probabilities, flip the tensor to get satisfied class from the highest severity to lowest
-        slide_class = 2 - \
-            torch.flip(slide_multilabels > self.class_prob_threshold,
-                       dims=(0,)).int().argmax().item()
+        # take the argmax of the probabilities
+        slide_class = torch.argmax(slide_multilabels).item()
 
         slide_pred = {
             "roi_logits": logits_dict,

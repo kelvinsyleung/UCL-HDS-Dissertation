@@ -40,9 +40,9 @@ if __name__ == "__main__":
     argParser.add_argument(
         "-t", "--roi_tile_size", help="slide tile size, e.g. -t 512", type=int, default=512)
     argParser.add_argument(
-        "-c", "--classifier_colour_space", help="colour space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
-    argParser.add_argument(
         "-o", "--obj_detect_colour_space", help="colour space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
+    argParser.add_argument(
+        "-c", "--classifier_colour_space", help="colour space: RGB, CIELAB e.g. -c RGB", type=str, default="RGB")
     argParser.add_argument(
         "-m", "--mag", help="magnification of patches for training: 20x or 40x, e.g. -m 20x", type=str, default="20x")
     argParser.add_argument(
@@ -65,8 +65,8 @@ if __name__ == "__main__":
     Path(OUTPUT_PLOT_PATH).mkdir(parents=True, exist_ok=True)
 
     NORM_PATH = f"{PROJECT_ROOT}/data/norms"
-    OBJ_DETECT_CSPACE = args.classifier_colour_space
-    CLASSIFIER_CSPACE = args.obj_detect_colour_space
+    OBJ_DETECT_CSPACE = args.obj_detect_colour_space
+    CLASSIFIER_CSPACE = args.classifier_colour_space
     PATCH_MAGNIFICATION = args.mag
     CLASSIFIER_BATCH_SIZE = args.classifier_batch_size
     TOP_K_BOXES = args.top_k_boxes
@@ -150,14 +150,15 @@ if __name__ == "__main__":
         f"Average time taken for inference per WSI: {avg_time} seconds")
 
     logging.info(
-        f"\n{classification_report(test_set_gt, test_set_pred, digits=4, target_names=list(LABELS2TYPE_MAP.values()))}")
+        f"\n{classification_report(test_set_gt, test_set_pred, digits=4, target_names=list(map(lambda label: label.split(' ')[0], LABELS2TYPE_MAP.values())))}")
     ConfusionMatrixDisplay.from_predictions(
         test_set_gt, test_set_pred,
-        display_labels=list(LABELS2TYPE_MAP.values()),
+        display_labels=list(map(lambda label: label.split(" ")[0], LABELS2TYPE_MAP.values())),
         xticks_rotation="vertical",
         cmap=plt.cm.Blues
     )
-    plt.savefig(f"{OUTPUT_PLOT_PATH}/confusion_matrix.png")
+    plt.tight_layout()
+    plt.savefig(f"{OUTPUT_PLOT_PATH}/cm_{OBJ_DETECT_CSPACE}-{TOP_K_BOXES}-{NMS_THRESHOLD}_{CLASSIFIER_CSPACE}-{PATCH_MAGNIFICATION}.png")
 
     for i, (test_wsi_path, test_annot_path) in enumerate(test_set):
         if test_annot_path:
@@ -168,6 +169,5 @@ if __name__ == "__main__":
                 test_set_roi_preds[i],
                 annot,
                 roi_patch_size=inference_model.roi_patch_size,
-                save_plot_path=f"{OUTPUT_PLOT_PATH}/{Path(test_wsi_path).stem}_pseudo_annot.png",
-                is_prob=False
+                save_plot_path=f"{OUTPUT_PLOT_PATH}/{Path(test_wsi_path).stem}_pseudo_annot.png"
             )
