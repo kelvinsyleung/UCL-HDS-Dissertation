@@ -1,8 +1,6 @@
-//import com.google.gson.GsonBuilder
-//import qupath.lib.io.GsonTools
 import qupath.lib.io.PathIO
 
-def outputPath = "D://UCL-HDS-DissertationDataset/BRACS_WSI_Annotations"
+def outputPath = "path/to/dataset/annotations/"
 
 def directory = buildFilePath(outputPath)
 def folder = new File(directory)
@@ -28,4 +26,3 @@ folder.eachFileRecurse() {
 }
 
 print "All completed!"
-
