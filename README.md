@@ -10,32 +10,6 @@ Dataset Used: https://www.bracs.icar.cnr.it/
 - To design a computationally efficient ML model for WSI analysis combining various ML techniques
 - To create reusable assets for pathologic image analysis and discuss implications on study results
 
-## Progress
-### Report Writing
-| Section | Status | Completion Date (Expected Date) |
-|---|---|---|
-| Literature Review | Completed 🙂 | 17-8-2023 |
-| Methodology | Completed 🙂 | 5-9-2023 |
-| Results | Dependency - Code ⬇️ | (27-8-2023) |
-| Discussion | WIP 🧑🏻‍💻 | (30-8-2023) |
-
-### Experiments
-| Module | Status | Completion Date (Expected Date) |
-|---|---|---|
-| Patch Extraction | Completed 🙂 | 28-7-2023 |
-| Data Transformation Pipeline | Completed 🙂 | 21-7-2023 |
-| CNN Classifier - Patch Level | Completed 🙂 | 8-8-2023 |
-| CNN Classifier - Slide Level | Completed 🙂 | 19-8-2023 |
-| Evalutaion Module | WIP 🧑🏻‍💻 | (15-8-2023) |
-
-### High Performance Cluster / Google Colab Run
-| Work | Status | Completion Date (Expected Date) |
-|---|---|---|
-| Upload Dataset | Completed 🙂 | 1-8-2023 |
-| Job scripts |  Completed 🙂 | 5-8-2023 |
-| Factorial Classifier | Completed 🙂 | 31-8-2023 |
-| Sequential Model | Completed 🙂 | 3-9-2023 |
-
 ## Data Directories structure
 DATA_PATH - BRACS_WSI
 
