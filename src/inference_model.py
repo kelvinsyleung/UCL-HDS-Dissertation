@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import geojson
 from patchify import patchify
 from shapely.geometry import shape, Polygon, box
-from shapely.ops import unary_union
-import networkx as nx
 
 import cv2
 import torch
@@ -388,19 +386,22 @@ class InferenceModel:
         scaled_bboxes = [box(*bbox) for bbox in scaled_bboxes]
 
         # convert ground truth annotations to shapely polygons
-        gt_annotations = [shape(feature.geometry) for feature in gt_annotations.features]
+        gt_annotations = [shape(feature.geometry)
+                          for feature in gt_annotations.features]
 
         # calculate intersection area
         intersection_areas = []
         for scaled_bbox in scaled_bboxes:
             intersection_areas.append(
-                [scaled_bbox.intersection(gt_annotation).area for gt_annotation in gt_annotations]
+                [scaled_bbox.intersection(
+                    gt_annotation).area for gt_annotation in gt_annotations]
             )
 
         # calculate ground truth total area
-        pred_total_area = sum([scaled_bbox.area for scaled_bbox in scaled_bboxes])
-        gt_total_area = sum([gt_annotation.area for gt_annotation in gt_annotations])
-
+        pred_total_area = sum(
+            [scaled_bbox.area for scaled_bbox in scaled_bboxes])
+        gt_total_area = sum(
+            [gt_annotation.area for gt_annotation in gt_annotations])
 
         # using intersection and union to calculate specificity and sensitivity
         intersection_areas = np.array(intersection_areas)

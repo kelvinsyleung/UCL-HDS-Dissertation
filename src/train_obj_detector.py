@@ -12,8 +12,6 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import torchvision
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 

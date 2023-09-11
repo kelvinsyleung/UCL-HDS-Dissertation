@@ -5,21 +5,11 @@ import logging
 import time
 
 import numpy as np
-from sklearn.metrics import ConfusionMatrixDisplay, classification_report
-import matplotlib.pyplot as plt
 
 import torch
 import torchvision
-import albumentations as A
-from albumentations.pytorch.transforms import ToTensorV2
 
-from tqdm import tqdm
-
-import openslide
 import geojson
-import torchstain
-from patchify import patchify
-import cv2
 
 from log_utils import setup_logging
 from inference_model import InferenceModel
@@ -126,6 +116,7 @@ if __name__ == "__main__":
             macro_sensitivity.append(metrics["sensitivity"])
 
     end_time = time.time()
-    logging.info(f"main - average inference time: {(end_time - start_time)/len(test_set)}")
+    logging.info(
+        f"main - average inference time: {(end_time - start_time)/len(test_set)}")
     logging.info(f"main - macro specificity: {np.mean(macro_specificity)}")
     logging.info(f"main - macro sensitivity: {np.mean(macro_sensitivity)}")
